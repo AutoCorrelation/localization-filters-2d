@@ -8,8 +8,8 @@ classdef ParticleFilter
     methods
         function obj = ParticleFilter(Noise, numParticles)
             obj.numParticles = numParticles;
-                obj.processNoise = load(['../data/processNoise',num2str(Noise),'.csv']);
-                obj.toaNoise = load(['../data/toaNoise',num2str(Noise),'.csv']);
+            obj.processNoise = load(['../data/processNoise',num2str(Noise),'.csv']);
+            obj.toaNoise = load(['../data/toaNoise',num2str(Noise),'.csv']);
         end
 
         function y = sampling(obj, x) % CANNOT ENHANCED
@@ -30,16 +30,6 @@ classdef ParticleFilter
             end
         end
 
-        function y = predictParam(obj, x, B, u, countStep, gamma)
-            y = zeros(size(x));
-            for k = 1:obj.numParticles
-                index = ceil(size(obj.processNoise, 2) * rand);
-                noise = obj.processNoise(:, index);
-                % index = k;
-                y(:, k) = x(:, k) + B(:, k) * u + noise * exp(-gamma*(countStep-2));
-                % y(:, k) = x(:, k) + B(:, k) * u + noise * gamma^(countStep-2);
-            end
-        end
 
         function y = update(~, x, w, z, pinvH, R)
             y = zeros(size(w));
@@ -58,15 +48,7 @@ classdef ParticleFilter
             y = y / sum(y);
         end
 
-        function y = updateParam(~, x, w, z, pinvH, R, gamma)
-            y = zeros(size(w));
-            R = R + 1e-6 * eye(size(R));
-            for k = 1:length(w)
-                y(k) = w(k) * mvnpdf(z, pinvH*x(:, k), R*gamma);
-                % y(k) = w(k) * mvnpdf(pinvH * z, x(:, k), pinvH * R * pinvH');
-            end
-            y = y / sum(y);
-        end
+
 
         function y = estimate(~, x, w)
             y = 0;
@@ -91,6 +73,29 @@ classdef ParticleFilter
             else
                 y = x;
             end
+        end
+
+
+
+        function y = predictParam(obj, x, B, u, countStep, gamma)
+            y = zeros(size(x));
+            for k = 1:obj.numParticles
+                index = ceil(size(obj.processNoise, 2) * rand);
+                noise = obj.processNoise(:, index);
+                % index = k;
+                y(:, k) = x(:, k) + B(:, k) * u + noise * exp(-gamma*(countStep-2));
+                % y(:, k) = x(:, k) + B(:, k) * u + noise * gamma^(countStep-2);
+            end
+        end
+
+        function y = updateParam(~, x, w, z, pinvH, R, gamma)
+            y = zeros(size(w));
+            R = R + 1e-6 * eye(size(R));
+            for k = 1:length(w)
+                y(k) = w(k) * mvnpdf(z, pinvH*x(:, k), R*gamma);
+                % y(k) = w(k) * mvnpdf(pinvH * z, x(:, k), pinvH * R * pinvH');
+            end
+            y = y / sum(y);
         end
 
         function y = metropolis_resampling(~,x,w)
@@ -198,7 +203,7 @@ classdef ParticleFilter
             end
             Ess = 1 / var_accum;
             if Ess < Npt*2/3
-                    
+
                 indexes = zeros(1, N);
                 residuals = N * w - floor(N * w);
                 indexes(1:sum(floor(N * w))) =  repelem(1:N, floor(N * w));
