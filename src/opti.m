@@ -1,3 +1,4 @@
+% this file is only For optimizing parameter gamma
 clear all;
 close all;
 clc;
