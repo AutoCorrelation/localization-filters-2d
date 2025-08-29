@@ -7,11 +7,11 @@ if yesorno == 'Y'
     Env.preSimulate();
 end
 
-% load data
+%% load data
 load('../data/z.mat');
 load('../data/toaPos.mat');
 load('../data/R.mat');
-% test
+%% test
 RMSE = RMSE();
 % parameters
 params = struct();
@@ -38,8 +38,10 @@ pf_data.weights = params.numParticles \ ones(params.numParticles, params.numPoin
 pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
 pf_data.RMSE = zeros(params.numNoise, 1);
 
+
 for countNoise = 1:params.numNoise
     pf = ParticleFilter(countNoise, params.numParticles);
+    pf = thresholding(pf,countNoise); % 
     for countIter = 1:params.pfIterations
         for countPoint = 2:params.numPoints  
             meas = z(:, countIter, countPoint, countNoise);
@@ -61,8 +63,8 @@ for countNoise = 1:params.numNoise
                 pf_data.vel(:, :, countPoint, countIter, countNoise) ...
                     = pf_data.particles(:, :, countPoint, countIter, countNoise) - pf_data.particles(:, :, countPoint-1, countIter, countNoise);
             else
-                particles_pred = pf.predict(particles_prev, vel_prev, 1);
-                % particles_pred = pf.predictParam(particles_prev, vel_prev, 1, countPoint, 3);
+                % particles_pred = pf.predict(particles_prev, vel_prev, 1);
+                particles_pred = pf.predictParam(particles_prev, vel_prev, 1, countPoint, 0.3);
 
                 weights_upd = pf.update(particles_pred, weights_curr, meas, params.H, Rmat);
                 est = pf.estimate(particles_pred, weights_upd);
