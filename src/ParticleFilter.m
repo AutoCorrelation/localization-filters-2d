@@ -12,6 +12,18 @@ classdef ParticleFilter
             obj.toaNoise = load(['../data/toaNoise',num2str(Noise),'.csv']);
         end
 
+        function obj = thresholding(obj,Noise)
+            Q = load(['../data/Q',num2str(Noise),'.csv']);
+            Qmax = Q(1);
+            hanroro = sqrt(Qmax);
+            for i=1:obj.numParticles
+                if Qmax<=norm(obj.processNoise(:,i))
+                    obj.processNoise(:,i) = [hanroro;-hanroro];
+                    hanroro = -hanroro;
+                end
+            end
+        end
+
         function y = sampling(obj, x) % CANNOT ENHANCED
             y = zeros(2, obj.numParticles);
             for k = 1:obj.numParticles
@@ -75,6 +87,16 @@ classdef ParticleFilter
             end
         end
 
+
+        % function y = predict_threshold(obj, x, B, u, Q)
+        %     y = zeros(size(x));
+        %     for k = 1:obj.numParticles
+        %         index = ceil(size(obj.processNoise, 2) * rand);
+        %         noise = obj.processNoise(:, index);
+        % 
+        %         y(:, k) = x(:, k) + B(:, k) * u + noise;
+        %     end
+        % end
 
 
         function y = predictParam(obj, x, B, u, countStep, gamma)
