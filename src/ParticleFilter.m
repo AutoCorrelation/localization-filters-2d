@@ -24,12 +24,13 @@ classdef ParticleFilter
             end
         end
 
-        function y = sampling(obj, x) % CANNOT ENHANCED
+        function y = sampling(obj, x) % me: toa+toaNoise / SHyeon: toa+based on wk, Q
             y = zeros(2, obj.numParticles);
             for k = 1:obj.numParticles
                 index = ceil(size(obj.toaNoise, 2) * rand);
-                % index = k;
+                
                 y(:, k) = x + obj.toaNoise(:, index);
+                % y(:, k) = x + obj.toaNoise(:, k);
             end
         end
 

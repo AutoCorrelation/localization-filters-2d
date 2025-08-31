@@ -1,9 +1,10 @@
 clear all;
 close all;
 clc;
-yesorno = input('do preSimulate? Y/N: ','s');
+disp('do preSimulate? Y/N: ')
+yesorno = input('', 's');
 if yesorno == 'Y'
-    Env = Env(1e5);
+    Env = Env(1e4);
     Env.preSimulate();
 end
 

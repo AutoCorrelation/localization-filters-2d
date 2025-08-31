@@ -91,6 +91,8 @@ classdef Env
                 writematrix(processNoise(:, :, n), strcat('../data/processNoise', num2str(n), '.csv'));
                 writematrix(processbias(:, n), strcat('../data/processbias', num2str(n), '.csv'));
                 writematrix(toaNoise(:, :, n), strcat('../data/toaNoise', num2str(n), '.csv'));
+                T=array2table(processNoise(:,:, n).', 'VariableNames',{'x','y'});
+                writetable(T, strcat('../data/processNoise_table', num2str(n), '.csv'));
             end
         end
     end
