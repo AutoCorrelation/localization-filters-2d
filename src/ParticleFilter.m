@@ -89,15 +89,20 @@ classdef ParticleFilter
         end
 
 
-        % function y = predict_threshold(obj, x, B, u, Q)
-        %     y = zeros(size(x));
-        %     for k = 1:obj.numParticles
-        %         index = ceil(size(obj.processNoise, 2) * rand);
-        %         noise = obj.processNoise(:, index);
-        % 
-        %         y(:, k) = x(:, k) + B(:, k) * u + noise;
-        %     end
-        % end
+        function y = roughening(obj,x, K)
+            % K is positive tuning constant
+            % N number of particles
+            % D is max(difference of components)
+            % dx dimension of state  % sigma = KDN^(-1/dx)
+            N = obj.numParticles;
+            dx = 2;
+            D = max(abs(diff(x, 1, 2)), [], 2);
+            sigma = K * D * N^(-1/dx);
+            for j = 1:N
+                x(:, j) = x(:, j) + sigma .* randn(dx, 1);
+            end
+            y = x;
+        end
 
 
         function y = predictParam(obj, x, B, u, countStep, gamma)

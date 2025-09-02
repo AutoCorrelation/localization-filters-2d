@@ -28,7 +28,7 @@ params.H = [...
     20, 20
     0, 20];
 pinvH = pinv(params.H);
-%{
+%{%
 % Particlefilter
 RMSE = RMSE();
 pf_RMSE = zeros(params.numNoise, alphaMax);
@@ -70,6 +70,8 @@ for a = 1:alphaMax
     end
 end
 %}
+
+%{
 kf1_RMSE = zeros(params.numNoise, alphaMax);
 for a = 1:alphaMax
     alpha = 0.1*a;
@@ -100,7 +102,7 @@ for a = 1:alphaMax
     end
     kf1_RMSE(: , a) = getRMSE(RMSE, kf1_data.estimatedPos);
 end
-
+%}
 
 % find minimum RMSE
 % [minvalue, minindex] = min(pf_RMSE,[],2);
