@@ -3,6 +3,7 @@ classdef ParticleFilter
         processNoise
         toaNoise
         numParticles
+        opti_w_gamma
     end
 
     methods
