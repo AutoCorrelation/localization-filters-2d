@@ -36,6 +36,7 @@ pf_data = struct();
 pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
 pf_data.RMSE = zeros(params.numNoise, 1);
 pfopti_w_gamma = [0.8 0.6 0.4 0.2 0.4];
+pfopti_ess_gamma = [0.8 0.9 0.9 0.7 0.9];
 
 
 for countNoise = 1:params.numNoise
@@ -44,12 +45,10 @@ for countNoise = 1:params.numNoise
     for countIter = 1:params.pfIterations
         particles_prev = [];
         vel_prev = [];
-        weights_curr = []; % 초기 가중치는 필요 시 여기서 생성
+        weights_curr = ones(params.numParticles, 1) / params.numParticles; % 초기 가중치 균일분포
         for countPoint = 2:params.numPoints
             meas = z(:, countIter, countPoint, countNoise); % 변수가 복잡해서 따로 변수에 저장함.
             Rmat = R(:, :, countIter, countPoint, countNoise);
-            % 초기 가중치는 균일하게 설정
-            weights_curr = ones(params.numParticles, 1) / params.numParticles;
 
             if countPoint < 3 % 1, 2 스텝에서 추정값을 toa 값으로 두고, 파티클 생성 후 속도 계산.
                 % 1,2 스텝: 추정값을 TOA로 지정하고 파티클은 TOA 주변 샘플링만 수행
@@ -63,13 +62,21 @@ for countNoise = 1:params.numNoise
                 vel_prev = p_curr - p_prev; % 초기 속도 추정 (2 x N)
 
             else
-                % particles_pred = pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
-                particles_pred = pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
-                weights_upd = pf.update(particles_pred, weights_curr, meas, params.H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
-                est = pf.estimate(particles_pred, weights_upd); % 각 파티클의 가중치를 가지고 가중합 (posteriori)
-                particles_res = pf.resample(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
-                particles_res = pf.roughening(particles_res, 0.2); % roughening
-                vel_new = est*ones(1,params.numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
+                particles_pred = ...
+                    pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
+                % particles_pred = ...
+                    % pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
+                weights_upd = ...
+                    pf.update(particles_pred, weights_curr, meas, params.H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
+                est = ...
+                    pf.estimate(particles_pred, weights_upd); % 각 파티클의 가중치를 가지고 가중합 (posteriori)
+                % [particles_res,weights_upd] = ...
+                %     pf.resampling(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+                [particles_res,weights_upd] = ...
+                    pf.resamplingEss(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+                vel_new = ...
+                    est*ones(1,params.numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
+
                 % 다음 반복을 위해 로컬 변수 갱신
                 particles_prev = particles_res;
                 vel_prev = vel_new;

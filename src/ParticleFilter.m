@@ -50,11 +50,11 @@ classdef ParticleFilter
             R = R + 1e-6 * eye(size(R));
             for k = 1:length(w)
                 % Method 1
-                % y(k) = w(k) * mvnpdf(z, pinvH*x(:, k), R);
+                y(k) = w(k) * mvnpdf(z, pinvH*x(:, k), R);
 
                 % Method 2
-                error = z - pinvH * x(:, k);
-                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
+                % error = z - pinvH * x(:, k);
+                % y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
 
                 % Method 3
                 % y(k) = w(k) * mvnpdf(pinvH * z, x(:, k), pinvH * R * pinvH');
@@ -71,7 +71,7 @@ classdef ParticleFilter
             end
         end
 
-        function y = resample(~, x, w)
+        function [y,weight] = resamplingEss(obj, x, w)
             var_accum = 0;
             Npt = length(w);
             for ind = 1:Npt
@@ -84,9 +84,23 @@ classdef ParticleFilter
                 [~, ind1] = sort([rpt; wtc]);
                 ind = find(ind1 <= Npt) - (0:Npt-1)';
                 y = x(:, ind);
+                % y = obj.roughening(y, 0.2); % roughening only after resampling
+                weight = ones(obj.numParticles, 1) / obj.numParticles;
             else
                 y = x;
+                weight = w;
             end
+        end
+
+        function [y,weight] = resampling(obj, x, w)
+            Npt = length(w);
+            wtc = cumsum(w);
+            rpt = rand(Npt, 1);
+            [~, ind1] = sort([rpt; wtc]);
+            ind = find(ind1 <= Npt) - (0:Npt-1)';
+            y = x(:, ind);
+            % y = obj.roughening(y, 0.2); % roughening only after resampling
+            weight = ones(obj.numParticles, 1) / obj.numParticles;
         end
 
 
@@ -125,6 +139,27 @@ classdef ParticleFilter
                 % y(k) = w(k) * mvnpdf(pinvH * z, x(:, k), pinvH * R * pinvH');
             end
             y = y / sum(y);
+        end
+
+        function [y,weight] = resampling_param(obj, x, w, gamma)
+            var_accum = 0;
+            Npt = length(w);
+            for ind = 1:Npt
+                var_accum = var_accum + w(ind)^2;
+            end
+            Ess = 1 / var_accum;
+            if Ess < Npt*gamma
+                wtc = cumsum(w);
+                rpt = rand(Npt, 1);
+                [~, ind1] = sort([rpt; wtc]);
+                ind = find(ind1 <= Npt) - (0:Npt-1)';
+                y = x(:, ind);
+                % y = obj.roughening(y, 0.2); % roughening only after resampling
+                weight = ones(obj.numParticles, 1) / obj.numParticles;
+            else
+                y = x;
+                weight = w;
+            end
         end
 
         function y = metropolis_resampling(~,x,w)
