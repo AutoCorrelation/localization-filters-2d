@@ -35,7 +35,7 @@ pf_RMSE = zeros(params.numNoise, alphaMax);
 pfopti_w_gamma = [0.8 0.6 0.4 0.2 0.4];
 
 for a = 1:alphaMax
-    alpha = 0.2*a;
+    alpha = 0.1*a;
     pf_data = struct();
     pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
     % pf_data.RMSE = zeros(params.numNoise, 1);

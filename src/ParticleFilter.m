@@ -47,17 +47,19 @@ classdef ParticleFilter
 
         function y = update(~, x, w, z, pinvH, R)
             y = zeros(size(w));
-            R = R + 1e-6 * eye(size(R));
+            R = R + 1e-8 * eye(size(R));
             for k = 1:length(w)
                 % Method 1
-                y(k) = w(k) * mvnpdf(z, pinvH*x(:, k), R);
+                % evaluate = 1 / norm(z - pinvH * x(:, k));
+                % 
+                % y(k) = w(k) * evaluate;
 
                 % Method 2
-                % error = z - pinvH * x(:, k);
-                % y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
+                error = z - pinvH * x(:, k);
+                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
 
-                % Method 3
-                % y(k) = w(k) * mvnpdf(pinvH * z, x(:, k), pinvH * R * pinvH');
+
+                
             end
             y = y / sum(y);
         end
@@ -84,7 +86,7 @@ classdef ParticleFilter
                 [~, ind1] = sort([rpt; wtc]);
                 ind = find(ind1 <= Npt) - (0:Npt-1)';
                 y = x(:, ind);
-                % y = obj.roughening(y, 0.2); % roughening only after resampling
+                y = obj.roughening(y, 0.2); % roughening only after resampling
                 weight = ones(obj.numParticles, 1) / obj.numParticles;
             else
                 y = x;
@@ -154,7 +156,7 @@ classdef ParticleFilter
                 [~, ind1] = sort([rpt; wtc]);
                 ind = find(ind1 <= Npt) - (0:Npt-1)';
                 y = x(:, ind);
-                % y = obj.roughening(y, 0.2); % roughening only after resampling
+                y = obj.roughening(y, 0.2); % roughening only after resampling
                 weight = ones(obj.numParticles, 1) / obj.numParticles;
             else
                 y = x;
