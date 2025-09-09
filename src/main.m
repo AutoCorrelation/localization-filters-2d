@@ -16,7 +16,7 @@ load('../data/R.mat');
 RMSE = RMSE();
 % parameters
 params = struct();
-params.numParticles = 1e3;
+params.numParticles = 1e4;
 params.numIterations = 1e3; %size(toaPos, 2);
 params.pfIterations = 1e3;
 params.numPoints = size(toaPos, 3);
@@ -35,8 +35,8 @@ pinvH = pinv(params.H);
 pf_data = struct();
 pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
 pf_data.RMSE = zeros(params.numNoise, 1);
-pfopti_w_gamma = [0.8 0.6 0.4 0.2 0.4];
-pfopti_ess_gamma = [0.8 0.9 0.9 0.7 0.9];
+pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.3];
+pfopti_ess_gamma = [0.65 0.65 0.65 0.65 0.65];
 
 
 for countNoise = 1:params.numNoise
@@ -62,10 +62,10 @@ for countNoise = 1:params.numNoise
                 vel_prev = p_curr - p_prev; % 초기 속도 추정 (2 x N)
 
             else
-                particles_pred = ...
-                    pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
                 % particles_pred = ...
-                    % pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
+                %     pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
+                particles_pred = ...
+                    pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
                 weights_upd = ...
                     pf.update(particles_pred, weights_curr, meas, params.H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
                 est = ...

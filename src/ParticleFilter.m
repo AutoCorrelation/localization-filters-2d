@@ -127,9 +127,8 @@ classdef ParticleFilter
             for k = 1:obj.numParticles
                 index = ceil(size(obj.processNoise, 2) * rand);
                 noise = obj.processNoise(:, index);
-                % index = k;
+
                 y(:, k) = x(:, k) + B(:, k) * u + noise * exp(-gamma*(countStep-2));
-                % y(:, k) = x(:, k) + B(:, k) * u + noise * gamma^(countStep-2);
             end
         end
 
@@ -143,14 +142,15 @@ classdef ParticleFilter
             y = y / sum(y);
         end
 
-        function [y,weight] = resampling_param(obj, x, w, gamma)
+        function [y,weight] = resampling_param(obj, x, w, countStep,gamma)
             var_accum = 0;
             Npt = length(w);
             for ind = 1:Npt
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*gamma
+            % if Ess < Npt*gamma % scalar mode
+            if Ess < Npt*(exp(-gamma*(countStep-2))) % increase mode
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);

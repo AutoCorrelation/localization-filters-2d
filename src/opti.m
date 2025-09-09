@@ -17,9 +17,9 @@ load('../data/R.mat');
 RMSE = RMSE();
 % parameters
 params = struct();
-params.numParticles = 1e3;
+params.numParticles = 3e3;
 params.numIterations = 1e3; %size(toaPos, 2);
-params.pfIterations = 1e3;
+params.pfIterations = 5e2;
 params.numPoints = size(toaPos, 3);
 params.numNoise = size(toaPos, 4);
 params.H = [...
@@ -32,10 +32,13 @@ params.H = [...
 pinvH = pinv(params.H);
 alphaMax = 9;
 pf_RMSE = zeros(params.numNoise, alphaMax);
-pfopti_w_gamma = [0.8 0.6 0.4 0.2 0.4];
-
+pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.3]; %분산이 클때만 거의 유효?
+% Ess 는 분산이 클 때 성능향상은 0.6~0.7에 근접 
+pfopti_ess_gamma = [0.8 0.8 0.8 0.7 0.7];
+pfopti_ess_increase = [0.55 0.55 0.55 0.55 0.55];
+pfopti_ess_decrease = [0.2 0.4 0.3 0.5 0.1];
 for a = 1:alphaMax
-    alpha = 0.1*a;
+    alpha = 0.01*a;
     pf_data = struct();
     pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
     % pf_data.RMSE = zeros(params.numNoise, 1);
@@ -68,10 +71,10 @@ for a = 1:alphaMax
                     vel_prev = p_curr - p_prev; % 초기 속도 추정 (2 x N)
 
                 else
-                    particles_pred = ...
-                        pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
                     % particles_pred = ...
-                    % pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
+                    %     pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
+                    particles_pred = ...
+                    pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
                     weights_upd = ...
                         pf.update(particles_pred, weights_curr, meas, params.H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
                     est = ...
@@ -81,7 +84,7 @@ for a = 1:alphaMax
                     % [particles_res,weights_upd] = ...
                     %     pf.resamplingEss(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
                     [particles_res,weights_upd] = ...
-                        pf.resampling_param(particles_pred, weights_upd, alpha); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+                        pf.resampling_param(particles_pred, weights_upd, countPoint,alpha); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
                     vel_new = ...
                         est*ones(1,params.numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
 
