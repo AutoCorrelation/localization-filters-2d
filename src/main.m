@@ -36,7 +36,7 @@ pf_data = struct();
 pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
 pf_data.RMSE = zeros(params.numNoise, 1);
 pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.3];
-pfopti_ess_gamma = [0.65 0.65 0.65 0.65 0.65];
+pfopti_ess_gamma = [0.55 0.55 0.55 0.55 0.55];
 
 
 for countNoise = 1:params.numNoise
@@ -74,6 +74,10 @@ for countNoise = 1:params.numNoise
                 %     pf.resampling(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
                 [particles_res,weights_upd] = ...
                     pf.resamplingEss(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+                % [particles_res,weights_upd] = ...
+                %     pf.resampling_param(particles_pred, weights_upd, countPoint, pfopti_ess_gamma(countNoise)); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+
+                % particles_res = particles_pred; % 리샘플링 안함 (파티클 빈곤현상 고려안함)
                 vel_new = ...
                     est*ones(1,params.numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
 

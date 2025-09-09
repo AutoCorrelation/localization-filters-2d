@@ -56,10 +56,7 @@ classdef ParticleFilter
 
                 % Method 2
                 error = z - pinvH * x(:, k);
-                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
-
-
-                
+                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));             
             end
             y = y / sum(y);
         end
@@ -80,7 +77,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt*4/5
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
@@ -149,8 +146,8 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            % if Ess < Npt*gamma % scalar mode
-            if Ess < Npt*(exp(-gamma*(countStep-2))) % increase mode
+            if Ess < Npt*4/5 % scalar mode
+            % if Ess < Npt*(exp(-gamma*(countStep-2))) % increase mode
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
@@ -218,7 +215,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt*4/5
                 positions = (rand + (0:N-1)) / N;
                 indexes = zeros(1, N);
                 cumulative_sum = cumsum(w);
