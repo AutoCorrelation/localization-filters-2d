@@ -77,7 +77,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*4/5
+            if Ess < Npt*1/2
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
@@ -146,8 +146,8 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*4/5 % scalar mode
-            % if Ess < Npt*(exp(-gamma*(countStep-2))) % increase mode
+            if Ess < Npt*gamma % scalar mode
+            % if Ess < Npt*(exp(gamma*(countStep-2))) % increase mode
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
@@ -169,7 +169,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt*4/5
                 indices = zeros(1, N);
                 indices(1) = randi(N);
                 for i = 2:N
