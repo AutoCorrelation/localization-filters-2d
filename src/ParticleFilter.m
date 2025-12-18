@@ -3,6 +3,7 @@ classdef ParticleFilter
         processNoise
         toaNoise
         numParticles
+        opti_w_gamma
     end
 
     methods
@@ -46,17 +47,16 @@ classdef ParticleFilter
 
         function y = update(~, x, w, z, pinvH, R)
             y = zeros(size(w));
-            R = R + 1e-6 * eye(size(R));
+            R = R + 1e-8 * eye(size(R));
             for k = 1:length(w)
                 % Method 1
-                % y(k) = w(k) * mvnpdf(z, pinvH*x(:, k), R);
+                % evaluate = 1 / norm(z - pinvH * x(:, k));
+                % 
+                % y(k) = w(k) * evaluate;
 
                 % Method 2
                 error = z - pinvH * x(:, k);
-                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
-
-                % Method 3
-                % y(k) = w(k) * mvnpdf(pinvH * z, x(:, k), pinvH * R * pinvH');
+                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));             
             end
             y = y / sum(y);
         end
@@ -70,22 +70,36 @@ classdef ParticleFilter
             end
         end
 
-        function y = resample(~, x, w)
+        function [y,weight] = resamplingEss(obj, x, w)
             var_accum = 0;
             Npt = length(w);
             for ind = 1:Npt
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt*1/2
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
                 ind = find(ind1 <= Npt) - (0:Npt-1)';
                 y = x(:, ind);
+                y = obj.roughening(y, 0.2); % roughening only after resampling
+                weight = ones(obj.numParticles, 1) / obj.numParticles;
             else
                 y = x;
+                weight = w;
             end
+        end
+
+        function [y,weight] = resampling(obj, x, w)
+            Npt = length(w);
+            wtc = cumsum(w);
+            rpt = rand(Npt, 1);
+            [~, ind1] = sort([rpt; wtc]);
+            ind = find(ind1 <= Npt) - (0:Npt-1)';
+            y = x(:, ind);
+            % y = obj.roughening(y, 0.2); % roughening only after resampling
+            weight = ones(obj.numParticles, 1) / obj.numParticles;
         end
 
 
@@ -110,9 +124,8 @@ classdef ParticleFilter
             for k = 1:obj.numParticles
                 index = ceil(size(obj.processNoise, 2) * rand);
                 noise = obj.processNoise(:, index);
-                % index = k;
+
                 y(:, k) = x(:, k) + B(:, k) * u + noise * exp(-gamma*(countStep-2));
-                % y(:, k) = x(:, k) + B(:, k) * u + noise * gamma^(countStep-2);
             end
         end
 
@@ -126,6 +139,28 @@ classdef ParticleFilter
             y = y / sum(y);
         end
 
+        function [y,weight] = resampling_param(obj, x, w, countStep,gamma)
+            var_accum = 0;
+            Npt = length(w);
+            for ind = 1:Npt
+                var_accum = var_accum + w(ind)^2;
+            end
+            Ess = 1 / var_accum;
+            if Ess < Npt*gamma % scalar mode
+            % if Ess < Npt*(exp(gamma*(countStep-2))) % increase mode
+                wtc = cumsum(w);
+                rpt = rand(Npt, 1);
+                [~, ind1] = sort([rpt; wtc]);
+                ind = find(ind1 <= Npt) - (0:Npt-1)';
+                y = x(:, ind);
+                y = obj.roughening(y, 0.2); % roughening only after resampling
+                weight = ones(obj.numParticles, 1) / obj.numParticles;
+            else
+                y = x;
+                weight = w;
+            end
+        end
+
         function y = metropolis_resampling(~,x,w)
             N = length(w);
             var_accum = 0;
@@ -134,7 +169,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt*4/5
                 indices = zeros(1, N);
                 indices(1) = randi(N);
                 for i = 2:N
@@ -180,7 +215,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt*4/5
                 positions = (rand + (0:N-1)) / N;
                 indexes = zeros(1, N);
                 cumulative_sum = cumsum(w);
