@@ -3,8 +3,8 @@ close all;
 clc;
 yesorno = input('do preSimulate? Y/N: ','s');
 if yesorno == 'Y'
-    Env = Env(1e5);
-    Env.preSimulate();
+    Env = Env(1e4);
+    Env.preSimulateH5();
 end
 
 %% load data

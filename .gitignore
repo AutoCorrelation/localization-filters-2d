@@ -1,2 +1,7 @@
 # Ignore data directory at repository root
 /data/
+
+__pycache__/
+*.pyc
+
+.vscode/
