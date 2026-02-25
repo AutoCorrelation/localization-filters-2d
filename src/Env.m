@@ -37,7 +37,7 @@ classdef Env
                     realPos = [p; p];
                     for n = 1:5
                         for a = 1:4
-                            ranging(a,1) = norm(realPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
+                            ranging(a,1) = norm(actualPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
                         end
                         z(:,i,p,n) = [...
                         ranging(1, 1)^2 - ranging(2, 1)^2 - 10^2;
@@ -103,6 +103,7 @@ classdef Env
             
             z = zeros(6, lnumIterations, lnumPoints, 5);
             toaPos = zeros(2, lnumIterations, lnumPoints, 5);
+            realPos = zeros(2, lnumIterations, lnumPoints, 5);  % toaPos와 동일 shape
             R = zeros(6, 6, lnumIterations, lnumPoints, 5);
             H = [...
                 0, -20
@@ -114,10 +115,11 @@ classdef Env
             pinvH = pinv(H);
             for i = 1:lnumIterations
                 for p = 1:lnumPoints
-                    realPos = [p; p];
+                    actualPos = [p; p];
                     for n = 1:5
+                        realPos(:, i, p, n) = actualPos;  % 모든 노이즈에 동일하게 저장
                         for a = 1:4
-                            ranging(a,1) = norm(realPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
+                            ranging(a,1) = norm(actualPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
                         end
                         z(:,i,p,n) = [...
                         ranging(1, 1)^2 - ranging(2, 1)^2 - 10^2;
@@ -146,13 +148,11 @@ classdef Env
                 delete(h5filename);
             end
             
-            % Save z, toaPos, R to HDF5
-            h5create(h5filename, '/z', size(z), 'DataType', 'double');
-            h5write(h5filename, '/z', z);
+            % Save z, toaPos, realPos, R to HDF5
             h5create(h5filename, '/toaPos', size(toaPos), 'DataType', 'double');
             h5write(h5filename, '/toaPos', toaPos);
-            h5create(h5filename, '/R', size(R), 'DataType', 'double');
-            h5write(h5filename, '/R', R);
+            h5create(h5filename, '/realPos', size(realPos), 'DataType', 'double');
+            h5write(h5filename, '/realPos', realPos);
 
             Q = zeros(2, 2, 5);
             P0 = zeros(2,2,5);
@@ -176,22 +176,14 @@ classdef Env
             toabias = squeeze(mean(toaNoise, 2));
             
             % Save Q, P0, processNoise, toaNoise, processbias to HDF5
-            h5create(h5filename, '/Q', [2, 2, 5], 'DataType', 'double');
-            h5create(h5filename, '/P0', [2, 2, 5], 'DataType', 'double');
-            h5create(h5filename, '/processNoise', size(processNoise), 'DataType', 'double');
-            h5create(h5filename, '/toaNoise', size(toaNoise), 'DataType', 'double');
-            h5create(h5filename, '/processbias', size(processbias), 'DataType', 'double');
+            
             
             for n = 1:5
                 Q(:, :, n) = EeeT(:, :, n) - processbias(:, n) * processbias(:, n)';
                 P0(:, :, n) = ExxT(:, :, n) - toabias(:, n) * toabias(:, n)';
             end
             
-            h5write(h5filename, '/Q', Q);
-            h5write(h5filename, '/P0', P0);
-            h5write(h5filename, '/processNoise', processNoise);
-            h5write(h5filename, '/toaNoise', toaNoise);
-            h5write(h5filename, '/processbias', processbias);
+            
         end
     end
 end

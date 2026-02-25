@@ -1,11 +1,17 @@
 clear all;
 close all;
 clc;
-yesorno = input('do preSimulate? Y/N: ','s');
-if yesorno == 'Y'
-    Env = Env(1e4);
-    Env.preSimulateH5();
-end
+
+Env = Env(1e5);
+Env.preSimulateH5();
+
+% yesorno = input('do preSimulate? Y/N: ','s');
+% if yesorno == 'Y'
+%     Env = Env(10000);
+%     Env.preSimulate();
+
+%     Env.preSimulateH5();
+% end
 
 %% load data
 load('../data/z.mat');
