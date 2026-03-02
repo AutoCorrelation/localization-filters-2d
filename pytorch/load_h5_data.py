@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import os
 
-def load_h5_simulation_data(h5_filepath='../data/simulation_data.h5'):
+def load_h5_simulation_data(h5_filepath='data/simulation_data.h5'):
     """
     Load HDF5 simulation data
     
@@ -20,30 +20,31 @@ def load_h5_simulation_data(h5_filepath='../data/simulation_data.h5'):
         raise FileNotFoundError(f"HDF5 file not found: {h5_filepath}")
     
     data_dict = {}
-    
+
     with h5py.File(h5_filepath, 'r') as f:
-        # Print file structure
-        print("HDF5 File Structure:")
+        # Print file structure (brief)
+        print("HDF5 File Structure (showing datasets):")
         print("-" * 50)
-        
-        def print_structure(name, obj):
-            if isinstance(obj, h5py.Dataset):
-                print(f"  Dataset: {name}, Shape: {obj.shape}, dtype: {obj.dtype}")
-            elif isinstance(obj, h5py.Group):
-                print(f"  Group: {name}")
-        
-        f.visititems(print_structure)
-        print("-" * 50)
-        
-        # Load all datasets
         for key in f.keys():
-            data_dict[key] = f[key][:]
-            print(f"\nLoaded '{key}': shape {data_dict[key].shape}")
-    
+            obj = f[key]
+            if isinstance(obj, h5py.Dataset):
+                print(f"  Dataset: {key}, Shape: {obj.shape}, dtype: {obj.dtype}")
+            else:
+                print(f"  Group: {key}")
+        print("-" * 50)
+
+        # Load only toaPos and realPos (if present)
+        for needed in ('toaPos', 'realPos'):
+            if needed in f:
+                data_dict[needed] = f[needed][:]
+                print(f"Loaded '{needed}': shape {data_dict[needed].shape}")
+            else:
+                print(f"Warning: '{needed}' not found in HDF5 file")
+
     return data_dict
 
 
-def get_dataset_info(h5_filepath='../data/simulation_data.h5'):
+def get_dataset_info(h5_filepath='data/simulation_data.h5'):
     """
     Print detailed information about all datasets in the HDF5 file
     
@@ -83,17 +84,17 @@ if __name__ == "__main__":
         print("\n")
         get_dataset_info()
         
-        # Access specific datasets
+        # Access specific datasets (only toaPos and realPos)
         print("\n" + "=" * 60)
-        print("Accessing specific datasets:")
-        print(f"\nz shape: {data['z'].shape}")
-        print(f"toaPos shape: {data['toaPos'].shape}")
-        print(f"R shape: {data['R'].shape}")
-        print(f"Q shape: {data['Q'].shape}")
-        print(f"P0 shape: {data['P0'].shape}")
-        print(f"processNoise shape: {data['processNoise'].shape}")
-        print(f"toaNoise shape: {data['toaNoise'].shape}")
-        print(f"processbias shape: {data['processbias'].shape}")
+        print("Accessing specific datasets (loaded):")
+        if 'toaPos' in data:
+            print(f"toaPos shape: {data['toaPos'].shape}")
+        else:
+            print("toaPos: not loaded")
+        if 'realPos' in data:
+            print(f"realPos shape: {data['realPos'].shape}")
+        else:
+            print("realPos: not loaded")
         
     except FileNotFoundError as e:
         print(f"Error: {e}")

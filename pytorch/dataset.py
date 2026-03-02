@@ -21,20 +21,15 @@ class SimulationDataset(Dataset):
         if not os.path.exists(h5_filepath):
             raise FileNotFoundError(f"HDF5 file not found: {h5_filepath}")
         
-        # Load data once
+        # Load only toaPos and realPos from HDF5
         with h5py.File(h5_filepath, 'r') as f:
-            self.z = torch.from_numpy(f['z'][:]).float()
             self.toaPos = torch.from_numpy(f['toaPos'][:]).float()
-            self.R = torch.from_numpy(f['R'][:]).float()
-            self.Q = torch.from_numpy(f['Q'][:]).float()
-            self.P0 = torch.from_numpy(f['P0'][:]).float()
-            self.processNoise = torch.from_numpy(f['processNoise'][:]).float()
-            self.toaNoise = torch.from_numpy(f['toaNoise'][:]).float()
-            self.processbias = torch.from_numpy(f['processbias'][:]).float()
-        
-        # numIterations x numPoints x noiseVariances
-        self.num_iterations, self.num_points, self.num_noise_levels = \
-            self.z.shape[1], self.z.shape[2], self.z.shape[3]
+            self.realPos = torch.from_numpy(f['realPos'][:]).float()
+
+        # Determine dimensions from toaPos: coords x iterations x points x noise_levels
+        self.num_iterations = self.toaPos.shape[1]
+        self.num_points = self.toaPos.shape[2]
+        self.num_noise_levels = self.toaPos.shape[3]
     
     def __len__(self):
         """Total number of samples"""
@@ -46,7 +41,7 @@ class SimulationDataset(Dataset):
         
         Returns:
         --------
-        dict with keys: 'z', 'toaPos', 'R', 'Q', 'P0', 'processNoise', 'toaNoise', 'processbias'
+        dict with keys: 'toaPos', 'realPos' and index info
         """
         # Convert linear index to 3D indices
         noise_idx = idx % self.num_noise_levels
@@ -54,14 +49,8 @@ class SimulationDataset(Dataset):
         iter_idx = idx // (self.num_noise_levels * self.num_points)
         
         return {
-            'z': self.z[:, iter_idx, point_idx, noise_idx],
             'toaPos': self.toaPos[:, iter_idx, point_idx, noise_idx],
-            'R': self.R[:, :, iter_idx, point_idx, noise_idx],
-            'Q': self.Q[:, :, noise_idx],
-            'P0': self.P0[:, :, noise_idx],
-            'processNoise': self.processNoise[:, iter_idx, noise_idx],
-            'toaNoise': self.toaNoise[:, iter_idx, noise_idx],
-            'processbias': self.processbias[:, noise_idx],
+            'realPos': self.realPos[:, iter_idx, point_idx, noise_idx],
             'iter_idx': iter_idx,
             'point_idx': point_idx,
             'noise_idx': noise_idx
@@ -84,20 +73,15 @@ class SimulationDatasets:
         if not os.path.exists(h5_filepath):
             raise FileNotFoundError(f"HDF5 file not found: {h5_filepath}")
         
-        # Load all data
+        # Load only toaPos and realPos
         with h5py.File(h5_filepath, 'r') as f:
-            self.z = f['z'][:]
             self.toaPos = f['toaPos'][:]
-            self.R = f['R'][:]
-            self.Q = f['Q'][:]
-            self.P0 = f['P0'][:]
-            self.processNoise = f['processNoise'][:]
-            self.toaNoise = f['toaNoise'][:]
-            self.processbias = f['processbias'][:]
-        
-        self.num_noise_levels = self.z.shape[3]
-        self.num_iterations = self.z.shape[1]
-        self.num_points = self.z.shape[2]
+            self.realPos = f['realPos'][:]
+
+        # Determine sizes from toaPos
+        self.num_noise_levels = self.toaPos.shape[3]
+        self.num_iterations = self.toaPos.shape[1]
+        self.num_points = self.toaPos.shape[2]
     
     def get_dataset_for_noise_level(self, noise_idx):
         """
@@ -113,14 +97,8 @@ class SimulationDatasets:
         dict with all data for the specified noise level
         """
         return {
-            'z': torch.from_numpy(self.z[:, :, :, noise_idx]).float(),
             'toaPos': torch.from_numpy(self.toaPos[:, :, :, noise_idx]).float(),
-            'R': torch.from_numpy(self.R[:, :, :, :, noise_idx]).float(),
-            'Q': torch.from_numpy(self.Q[:, :, noise_idx]).float(),
-            'P0': torch.from_numpy(self.P0[:, :, noise_idx]).float(),
-            'processNoise': torch.from_numpy(self.processNoise[:, :, noise_idx]).float(),
-            'toaNoise': torch.from_numpy(self.toaNoise[:, :, noise_idx]).float(),
-            'processbias': torch.from_numpy(self.processbias[:, noise_idx]).float(),
+            'realPos': torch.from_numpy(self.realPos[:, :, :, noise_idx]).float(),
         }
     
     def get_all_data(self):
@@ -132,14 +110,8 @@ class SimulationDatasets:
         dict with all datasets converted to PyTorch tensors
         """
         return {
-            'z': torch.from_numpy(self.z).float(),
             'toaPos': torch.from_numpy(self.toaPos).float(),
-            'R': torch.from_numpy(self.R).float(),
-            'Q': torch.from_numpy(self.Q).float(),
-            'P0': torch.from_numpy(self.P0).float(),
-            'processNoise': torch.from_numpy(self.processNoise).float(),
-            'toaNoise': torch.from_numpy(self.toaNoise).float(),
-            'processbias': torch.from_numpy(self.processbias).float(),
+            'realPos': torch.from_numpy(self.realPos).float(),
         }
     
     def printinfo(self):
@@ -151,14 +123,8 @@ class SimulationDatasets:
         print(f"Points: {self.num_points}")
         print(f"Total samples: {self.num_noise_levels * self.num_iterations * self.num_points}")
         print("\nDataset shapes:")
-        print(f"  z: {self.z.shape}")
         print(f"  toaPos: {self.toaPos.shape}")
-        print(f"  R: {self.R.shape}")
-        print(f"  Q: {self.Q.shape}")
-        print(f"  P0: {self.P0.shape}")
-        print(f"  processNoise: {self.processNoise.shape}")
-        print(f"  toaNoise: {self.toaNoise.shape}")
-        print(f"  processbias: {self.processbias.shape}")
+        print(f"  realPos: {self.realPos.shape}")
 
 
 # Example usage

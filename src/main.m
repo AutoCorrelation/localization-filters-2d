@@ -1,11 +1,17 @@
 clear all;
 close all;
 clc;
-yesorno = input('do preSimulate? Y/N: ','s');
-if yesorno == 'Y'
-    Env = Env(1e4);
-    Env.preSimulateH5();
-end
+
+% Env = Env(1e5);
+% Env.preSimulate();
+
+% yesorno = input('do preSimulate? Y/N: ','s');
+% if yesorno == 'Y'
+%     Env = Env(10000);
+%     Env.preSimulate();
+
+%     Env.preSimulateH5();
+% end
 
 %% load data
 load('../data/z.mat');
@@ -28,6 +34,17 @@ params.H = [...
     20, 20
     0, 20];
 pinvH = pinv(params.H);
+%% TOA---------------------------------------------------------------------
+toaPosition = zeros(2, params.numPoints, params.numIterations, params.numNoise);
+for countNoise = 1:params.numNoise
+    for countIter = 1:params.numIterations
+        for countPoint = 2:params.numPoints
+            toaPosition(:, countPoint, countIter, countNoise) = toaPos(:,countIter,countPoint,countNoise);
+        end
+    end
+end
+toaRMSE = RMSE.getRMSE(toaPosition);
+
 
 
 %% Particlefilter-------------------------------------------------------------------
@@ -41,7 +58,7 @@ pf_data.RMSE = zeros(params.numNoise, 1);
 
 for countNoise = 1:params.numNoise
     pf = ParticleFilter(countNoise, params.numParticles);
-    pf = thresholding(pf,countNoise); % 
+    % pf = thresholding(pf,countNoise); % 
     for countIter = 1:params.pfIterations
         for countPoint = 2:params.numPoints  
             meas = z(:, countIter, countPoint, countNoise);
@@ -150,4 +167,5 @@ semilogx(noisevalue,kf_data.RMSE,'DisplayName','Kalman Filter');
 hold on;
 semilogx(noisevalue,pf_data.RMSE,'DisplayName','Particle Filter');
 semilogx(noisevalue,kf1_data.RMSE,'DisplayName','Kalman Filter 1');
+semilogx(noisevalue,toaRMSE,'DisplayName','ToA');
 legend show;
