@@ -1,12 +1,17 @@
 clear all;
 close all;
 clc;
-disp('do preSimulate? Y/N: ')
-yesorno = input('', 's');
-if yesorno == 'Y'
-    Env = Env(1e5);
-    Env.preSimulate();
-end
+
+% Env = Env(1e5);
+% Env.preSimulate();
+
+% yesorno = input('do preSimulate? Y/N: ','s');
+% if yesorno == 'Y'
+%     Env = Env(10000);
+%     Env.preSimulate();
+
+%     Env.preSimulateH5();
+% end
 
 %% load data
 load('../data/z.mat');
@@ -29,6 +34,17 @@ params.H = [...
     20, 20
     0, 20];
 pinvH = pinv(params.H);
+%% TOA---------------------------------------------------------------------
+toaPosition = zeros(2, params.numPoints, params.numIterations, params.numNoise);
+for countNoise = 1:params.numNoise
+    for countIter = 1:params.numIterations
+        for countPoint = 2:params.numPoints
+            toaPosition(:, countPoint, countIter, countNoise) = toaPos(:,countIter,countPoint,countNoise);
+        end
+    end
+end
+toaRMSE = RMSE.getRMSE(toaPosition);
+
 
 
 %% Particlefilter-------------------------------------------------------------------
@@ -41,8 +57,8 @@ pfopti_w_gamma = [0.5 0.4 0.4 0.4 0.4];
 
 
 for countNoise = 1:params.numNoise
-    pf = ParticleFilter(countNoise, params.numParticles); % 클래스 객체 불러오기
-    % pf = thresholding(pf,countNoise); % 쓰레기홀딩
+    pf = ParticleFilter(countNoise, params.numParticles);
+    % pf = thresholding(pf,countNoise); % 
     for countIter = 1:params.pfIterations
         particles_prev = [];
         vel_prev = [];
@@ -165,4 +181,5 @@ semilogx(noisevalue,kf_data.RMSE,'DisplayName','Kalman Filter');
 hold on;
 semilogx(noisevalue,kf1_data.RMSE,'DisplayName','Kalman Filter 1');
 semilogx(noisevalue,pf_data.RMSE,'DisplayName','Particle Filter','LineWidth',1.5);
+semilogx(noisevalue,toaRMSE,'DisplayName','ToA');
 legend show;

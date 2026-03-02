@@ -37,7 +37,7 @@ classdef Env
                     realPos = [p; p];
                     for n = 1:5
                         for a = 1:4
-                            ranging(a,1) = norm(realPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
+                            ranging(a,1) = norm(actualPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
                         end
                         z(:,i,p,n) = [...
                         ranging(1, 1)^2 - ranging(2, 1)^2 - 10^2;
@@ -94,6 +94,98 @@ classdef Env
                 T=array2table(processNoise(:,:, n).', 'VariableNames',{'x','y'});
                 writetable(T, strcat('../data/processNoise_table', num2str(n), '.csv'));
             end
+        end
+
+        function preSimulateH5(obj)
+            ranging = zeros(4, 1);
+            lAnchor = obj.Anchor;
+            lnoiseVariance = obj.noiseVariance;
+            lnumIterations = obj.numIterations;
+            lnumPoints = obj.numPoints;
+            
+            z = zeros(6, lnumIterations, lnumPoints, 5);
+            toaPos = zeros(2, lnumIterations, lnumPoints, 5);
+            realPos = zeros(2, lnumIterations, lnumPoints, 5);  % toaPos와 동일 shape
+            R = zeros(6, 6, lnumIterations, lnumPoints, 5);
+            H = [...
+                0, -20
+                20, -20
+                20, 0
+                20, 0
+                20, 20
+                0, 20];
+            pinvH = pinv(H);
+            for i = 1:lnumIterations
+                for p = 1:lnumPoints
+                    actualPos = [p; p];
+                    for n = 1:5
+                        realPos(:, i, p, n) = actualPos;  % 모든 노이즈에 동일하게 저장
+                        for a = 1:4
+                            ranging(a,1) = norm(actualPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
+                        end
+                        z(:,i,p,n) = [...
+                        ranging(1, 1)^2 - ranging(2, 1)^2 - 10^2;
+                        ranging(1, 1)^2 - ranging(3, 1)^2;
+                        ranging(1, 1)^2 - ranging(4, 1)^2 + 10^2;
+                        ranging(2, 1)^2 - ranging(3, 1)^2 + 10^2;
+                        ranging(2, 1)^2 - ranging(4, 1)^2 + 2*(10^2);
+                        ranging(3, 1)^2 - ranging(4, 1)^2 + 10^2];
+
+                        toaPos(:,i,p,n) = pinvH * z(:,i,p,n);
+
+                        R(:,:,i,p,n) = [4*obj.noiseVariance(n)*(ranging(1,1)^2+ranging(2,1)^2) 4*obj.noiseVariance(n)*(ranging(1,1)^2) 4*obj.noiseVariance(n)*(ranging(1,1)^2) -4*obj.noiseVariance(n)*(ranging(2,1)^2) -4*obj.noiseVariance(n)*(ranging(2,1)^2) 0;...
+                                    4*obj.noiseVariance(n)*(ranging(1,1)^2) 4*obj.noiseVariance(n)*(ranging(1,1)^2+ranging(3,1)^2) 4*obj.noiseVariance(n)*(ranging(1,1)^2) 4*obj.noiseVariance(n)*(ranging(3,1)^2) 0 -4*obj.noiseVariance(n)*(ranging(3,1)^2);...
+                                    4*obj.noiseVariance(n)*(ranging(1,1)^2) 4*obj.noiseVariance(n)*(ranging(1,1)^2) 4*obj.noiseVariance(n)*(ranging(1,1)^2+ranging(4,1)^2) 0 4*obj.noiseVariance(n)*(ranging(4,1)^2) 4*obj.noiseVariance(n)*(ranging(4,1)^2);...
+                                    -4*obj.noiseVariance(n)*(ranging(2,1)^2) 4*obj.noiseVariance(n)*(ranging(3,1)^2) 0 4*obj.noiseVariance(n)*(ranging(2,1)^2+ranging(3,1)^2) 4*obj.noiseVariance(n)*(ranging(2,1)^2) -4*obj.noiseVariance(n)*(ranging(3,1)^2);...
+                                    -4*obj.noiseVariance(n)*(ranging(2,1)^2) 0 4*obj.noiseVariance(n)*(ranging(4,1)^2) 4*obj.noiseVariance(n)*(ranging(2,1)^2) 4*obj.noiseVariance(n)*(ranging(2,1)^2+ranging(4,1)^2) 4*obj.noiseVariance(n)*(ranging(4,1)^2);...
+                                    0 -4*obj.noiseVariance(n)*(ranging(3,1)^2) 4*obj.noiseVariance(n)*(ranging(4,1)^2) -4*obj.noiseVariance(n)*(ranging(3,1)^2) 4*obj.noiseVariance(n)*(ranging(4,1)^2) 4*obj.noiseVariance(n)*(ranging(3,1)^2+ranging(4,1)^2)
+                                    ];
+                    end
+                end
+            end
+            
+            % Create HDF5 file
+            h5filename = '../data/simulation_data.h5';
+            if isfile(h5filename)
+                delete(h5filename);
+            end
+            
+            % Save z, toaPos, realPos, R to HDF5
+            h5create(h5filename, '/toaPos', size(toaPos), 'DataType', 'double');
+            h5write(h5filename, '/toaPos', toaPos);
+            h5create(h5filename, '/realPos', size(realPos), 'DataType', 'double');
+            h5write(h5filename, '/realPos', realPos);
+
+            Q = zeros(2, 2, 5);
+            P0 = zeros(2,2,5);
+            eeT = zeros(2, 2, lnumIterations, 5);
+            xxT = zeros(2, 2, lnumIterations, 5);
+            vel = toaPos(:,:,2,:) - toaPos(:,:,1,:);
+            vel = squeeze(vel);
+            p3 = 3 * ones(size(vel));
+            p2 = 2 * ones(size(vel));
+            processNoise = p3 - squeeze(toaPos(:,:,2,:)) - vel;
+            toaNoise = p2 - squeeze(toaPos(:,:,2,:));
+            for i = 1:lnumIterations
+                for n = 1:5
+                    eeT(:, :, i, n) = processNoise(:, i, n) * processNoise(:, i, n)';
+                    xxT(:, :, i, n) = toaNoise(:, i, n) * toaNoise(:, i, n)';
+                end
+            end
+            EeeT = squeeze(mean(eeT, 3));
+            ExxT = squeeze(mean(xxT, 3));
+            processbias = squeeze(mean(processNoise, 2));
+            toabias = squeeze(mean(toaNoise, 2));
+            
+            % Save Q, P0, processNoise, toaNoise, processbias to HDF5
+            
+            
+            for n = 1:5
+                Q(:, :, n) = EeeT(:, :, n) - processbias(:, n) * processbias(:, n)';
+                P0(:, :, n) = ExxT(:, :, n) - toabias(:, n) * toabias(:, n)';
+            end
+            
+            
         end
     end
 end
