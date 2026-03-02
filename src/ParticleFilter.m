@@ -29,9 +29,8 @@ classdef ParticleFilter
             y = zeros(2, obj.numParticles);
             for k = 1:obj.numParticles
                 index = ceil(size(obj.toaNoise, 2) * rand);
-                
+
                 y(:, k) = x + obj.toaNoise(:, index);
-                % y(:, k) = x + obj.toaNoise(:, k);
             end
         end
 
@@ -45,18 +44,18 @@ classdef ParticleFilter
         end
 
 
-        function y = update(~, x, w, z, pinvH, R)
+        function y = update(~, x, w, z, H, R)
             y = zeros(size(w));
             R = R + 1e-8 * eye(size(R));
             for k = 1:length(w)
                 % Method 1
                 % evaluate = 1 / norm(z - pinvH * x(:, k));
-                % 
+                %
                 % y(k) = w(k) * evaluate;
 
                 % Method 2
-                error = z - pinvH * x(:, k);
-                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));             
+                error = z - H * x(:, k);
+                y(k) = w(k) * exp(-0.5 * (error' * (R \ error)));
             end
             y = y / sum(y);
         end
@@ -147,7 +146,7 @@ classdef ParticleFilter
             end
             Ess = 1 / var_accum;
             if Ess < Npt*gamma % scalar mode
-            % if Ess < Npt*(exp(gamma*(countStep-2))) % increase mode
+                % if Ess < Npt*(exp(gamma*(countStep-2))) % increase mode
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
@@ -187,7 +186,7 @@ classdef ParticleFilter
             end
         end
 
-        function y = multinomial_resampling(~,x,w)
+        function [y,weight] = multinomial_resampling(obj,x,w)
             N = length(w);
             var_accum = 0;
             Npt = length(w);
@@ -198,12 +197,14 @@ classdef ParticleFilter
             if Ess < Npt/2
                 edges = min([0 cumsum(w')], 1); % Cumulative sum of weights
                 edges(end) = 1; % Ensure sum is exactly one
-                u1 = rand/N; % Start of uniform distribution
-                u = u1 + (0:N-1)'/N; % Uniform distribution
+                u = rand(N, 1); % Multinomial: independent uniform samples
                 [~, ~, indices] = histcounts(u, edges); % Find indices
                 y = x(:, indices); % Resample particles
+                y = obj.roughening(y, 0.2); % roughening only after resampling
+                weight = ones(obj.numParticles, 1) / obj.numParticles;
             else
                 y = x;
+                weight = w;
             end
         end
 

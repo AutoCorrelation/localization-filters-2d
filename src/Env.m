@@ -34,7 +34,7 @@ classdef Env
             pinvH = pinv(H);
             for i = 1:lnumIterations
                 for p = 1:lnumPoints
-                    realPos = [p; p];
+                    actualPos = [p; p];
                     for n = 1:5
                         for a = 1:4
                             ranging(a,1) = norm(actualPos - lAnchor(:,a)) + sqrt(lnoiseVariance(n)) * randn;
