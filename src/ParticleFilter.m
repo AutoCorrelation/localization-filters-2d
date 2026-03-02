@@ -76,7 +76,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt/2
                 wtc = cumsum(w);
                 rpt = rand(Npt, 1);
                 [~, ind1] = sort([rpt; wtc]);
@@ -128,7 +128,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt/2
                 indices = zeros(1, N);
                 indices(1) = randi(N);
                 for i = 2:N
@@ -154,7 +154,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt/2
                 edges = min([0 cumsum(w')], 1); % Cumulative sum of weights
                 edges(end) = 1; % Ensure sum is exactly one
                 u1 = rand/N; % Start of uniform distribution
@@ -174,7 +174,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt/2
                 positions = (rand + (0:N-1)) / N;
                 indexes = zeros(1, N);
                 cumulative_sum = cumsum(w);
@@ -199,7 +199,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt/2
                 positions = ((0:N-1) + rand(1, N)) / N;
                 indexes = zeros(1, N);
                 cumulative_sum = cumsum(w);
@@ -224,7 +224,7 @@ classdef ParticleFilter
                 var_accum = var_accum + w(ind)^2;
             end
             Ess = 1 / var_accum;
-            if Ess < Npt*2/3
+            if Ess < Npt/2
 
                 indexes = zeros(1, N);
                 residuals = N * w - floor(N * w);
