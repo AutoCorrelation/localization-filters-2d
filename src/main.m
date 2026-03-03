@@ -20,25 +20,24 @@ load('../data/R.mat');
 %% test
 RMSE = RMSE();
 % parameters
-params = struct();
-params.numParticles = 600; % 파티클 갯수 : 1000=분산이 클때 좋고, 2000= 분산이 작을때도 좋다. 분산이 1일때는 잘안됨
-params.numIterations = 1e4; %size(toaPos, 2);
-params.pfIterations = 1e4;
-params.numPoints = size(toaPos, 3);
-params.numNoise = size(toaPos, 4);
-params.H = [...
+numParticles = 100; % 파티클 갯수 : 1000=분산이 클때 좋고, 2000= 분산이 작을때도 좋다. 분산이 1일때는 잘안됨
+numIterations = 1e3; %size(toaPos, 2);
+pfIterations = 1e3;
+numPoints = size(toaPos, 3);
+numNoise = size(toaPos, 4);
+H = [...
     0, -20
     20, -20
     20, 0
     20, 0
     20, 20
     0, 20];
-pinvH = pinv(params.H);
+pinvH = pinv(H);
 %% TOA---------------------------------------------------------------------
-toaPosition = zeros(2, params.numPoints, params.numIterations, params.numNoise);
-for countNoise = 1:params.numNoise
-    for countIter = 1:params.numIterations
-        for countPoint = 2:params.numPoints
+toaPosition = zeros(2, numPoints, numIterations, numNoise);
+for countNoise = 1:numNoise
+    for countIter = 1:numIterations
+        for countPoint = 2:numPoints
             toaPosition(:, countPoint, countIter, countNoise) = toaPos(:,countIter,countPoint,countNoise);
         end
     end
@@ -49,21 +48,21 @@ toaRMSE = RMSE.getRMSE(toaPosition);
 
 %% Particlefilter-------------------------------------------------------------------
 pf_data = struct();
-pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
-pf_data.RMSE = zeros(params.numNoise, 1);
+pf_data.estimatedPos = zeros(2, numPoints, pfIterations, numNoise);
+pf_data.RMSE = zeros(numNoise, 1);
 pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.2];
 % pfopti_w_gamma = [0.5 0.4 0.4 0.4 0.4];
 % pfopti_ess_gamma = [0.55 0.55 0.55 0.55 0.55];
 
 
-for countNoise = 1:params.numNoise
-    pf = ParticleFilter(countNoise, params.numParticles);
+for countNoise = 1:numNoise
+    pf = ParticleFilter(countNoise, numParticles);
     % pf = thresholding(pf,countNoise); % 
-    for countIter = 1:params.pfIterations
+    for countIter = 1:pfIterations
         particles_prev = [];
         vel_prev = [];
-        weights_curr = ones(params.numParticles, 1) / params.numParticles; % 초기 가중치 균일분포
-        for countPoint = 2:params.numPoints
+        weights_curr = ones(numParticles, 1) / numParticles; % 초기 가중치 균일분포
+        for countPoint = 2:numPoints
             meas = z(:, countIter, countPoint, countNoise); % 변수가 복잡해서 따로 변수에 저장함.
             Rmat = R(:, :, countIter, countPoint, countNoise);
 
@@ -84,7 +83,7 @@ for countNoise = 1:params.numNoise
                 particles_pred = ...
                     pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
                 weights_upd = ...
-                    pf.update(particles_pred, weights_curr, meas, params.H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
+                    pf.update(particles_pred, weights_curr, meas, H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
                 est = ...
                     pf.estimate(particles_pred, weights_upd); % 각 파티클의 가중치를 가지고 가중합 (posteriori)
                 % [particles_res,weights_upd] = ...
@@ -97,7 +96,7 @@ for countNoise = 1:params.numNoise
 
                 % particles_res = particles_pred; % 리샘플링 안함 (파티클 빈곤현상 고려안함)
                 vel_new = ...
-                    est*ones(1,params.numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
+                    est*ones(1,numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
                 % alpha = 0.5; % 관성 개념 도입 비율
                 % vel_new = vel_prev*(1-alpha) + vel_new*alpha; % 속도에 관성 개념 도입 (이전 속도와 새로 계산한 속도의 평균)
 
@@ -118,16 +117,16 @@ pf_data.RMSE = RMSE.getRMSE(pf_data.estimatedPos); % 성능 지표 RMSE
 %% Kalman Filter----------------------------------------------------
 % %{
 kf_data = struct();
-kf_data.estimatedPos = zeros(2, params.numPoints, params.numIterations, params.numNoise);
-kf_data.errCov = zeros(2, 2, params.numPoints, params.numIterations, params.numNoise);
+kf_data.estimatedPos = zeros(2, numPoints, numIterations, numNoise);
+kf_data.errCov = zeros(2, 2, numPoints, numIterations, numNoise);
 kf_data.vel = zeros(size(kf_data.estimatedPos));
-kf_data.RMSE = zeros(params.numNoise, 1);
+kf_data.RMSE = zeros(numNoise, 1);
 
-for countNoise = 1:params.numNoise
+for countNoise = 1:numNoise
     % for countNoise = 5
-    kf = KalmanFilter(countNoise, params.H);
-    for countIter = 1:params.numIterations
-        for countPoint = 2:params.numPoints
+    kf = KalmanFilter(countNoise, H);
+    for countIter = 1:numIterations
+        for countPoint = 2:numPoints
             if countPoint < 3
                 kf_data.estimatedPos(:, countPoint-1, countIter, countNoise) = toaPos(:, countIter, countPoint-1, countNoise);
                 kf_data.estimatedPos(:, countPoint, countIter, countNoise) = toaPos(:, countIter, countPoint, countNoise);
@@ -147,23 +146,23 @@ kf_data.RMSE = RMSE.getRMSE(kf_data.estimatedPos);
 
 %% Kalman Filter modified----------------------------------------------------
 kf1_data = struct();
-kf1_data.estimatedPos = zeros(2, params.numPoints, params.numIterations, params.numNoise);
-kf1_data.errCov = zeros(2, 2, params.numPoints, params.numIterations, params.numNoise);
+kf1_data.estimatedPos = zeros(2, numPoints, numIterations, numNoise);
+kf1_data.errCov = zeros(2, 2, numPoints, numIterations, numNoise);
 kf1_data.vel = zeros(size(kf1_data.estimatedPos));
-kf1_data.RMSE = zeros(params.numNoise, 1);
+kf1_data.RMSE = zeros(numNoise, 1);
 optimal_gamma = [0.5, 0.5, 0.4, 0.3, 0.5];
 
-for countNoise = 1:params.numNoise
+for countNoise = 1:numNoise
     % for countNoise = 5
-    kf = KalmanFilter1(countNoise, params.H);
-    for countIter = 1:params.numIterations
-        for countPoint = 2:params.numPoints
+    kf = KalmanFilter(countNoise, H);
+    for countIter = 1:numIterations
+        for countPoint = 2:numPoints
             if countPoint < 3
                 kf1_data.estimatedPos(:, countPoint-1, countIter, countNoise) = toaPos(:, countIter, countPoint-1, countNoise);
                 kf1_data.estimatedPos(:, countPoint, countIter, countNoise) = toaPos(:, countIter, countPoint, countNoise);
                 kf1_data.vel(:, countPoint, countIter, countNoise) = kf1_data.estimatedPos(:, countPoint, countIter, countNoise) - kf1_data.estimatedPos(:, countPoint-1, countIter, countNoise);
             else
-                [xhat, Phat] = kf.predict(kf1_data.estimatedPos(:, countPoint-1, countIter, countNoise), kf1_data.errCov(:, :, countPoint-1, countIter, countNoise), kf1_data.vel(:, countPoint-1, countIter, countNoise), 1, countPoint, optimal_gamma(countNoise));
+                [xhat, Phat] = kf.predict_decayQ(kf1_data.estimatedPos(:, countPoint-1, countIter, countNoise), kf1_data.errCov(:, :, countPoint-1, countIter, countNoise), kf1_data.vel(:, countPoint-1, countIter, countNoise), 1, countPoint, optimal_gamma(countNoise));
                 kf = kf.update(Phat, R(:, :, countIter, countPoint, countNoise));
                 [kf1_data.estimatedPos(:, countPoint, countIter, countNoise), kf1_data.errCov(:,:, countPoint, countIter, countNoise)] = kf.estimate(xhat, Phat, z(:, countIter, countPoint, countNoise));
                 kf1_data.vel(:, countPoint, countIter, countNoise) = kf1_data.estimatedPos(:, countPoint, countIter, countNoise) - kf1_data.estimatedPos(:, countPoint-1, countIter, countNoise);

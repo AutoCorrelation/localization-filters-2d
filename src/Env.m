@@ -95,7 +95,7 @@ classdef Env
                 writetable(T, strcat('../data/processNoise_table', num2str(n), '.csv'));
             end
         end
-
+%{
         function preSimulateH5(obj)
             ranging = zeros(4, 1);
             lAnchor = obj.Anchor;
@@ -187,5 +187,6 @@ classdef Env
             
             
         end
+        %}
     end
 end

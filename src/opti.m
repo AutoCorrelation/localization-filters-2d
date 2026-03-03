@@ -16,22 +16,20 @@ load('../data/R.mat');
 %% test
 RMSE = RMSE();
 % parameters
-params = struct();
-params.numParticles = 1e3;
-params.numIterations = 1e3; %size(toaPos, 2);
-params.pfIterations = 500;
-params.numPoints = size(toaPos, 3);
-params.numNoise = size(toaPos, 4);
-params.H = [...
+numParticles = 1e3;
+numIterations = 1e3; % size(toaPos, 2);
+pfIterations = 500;
+numPoints = size(toaPos, 3);
+numNoise = size(toaPos, 4);
+H = [...
     0, -20
     20, -20
     20, 0
     20, 0
     20, 20
     0, 20];
-pinvH = pinv(params.H);
 alphaMax = 9;
-pf_RMSE = zeros(params.numNoise, alphaMax);
+pf_RMSE = zeros(numNoise, alphaMax);
 % pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.3]; %분산이 클때만 거의 유효?
 pfopti_w_gamma = [0.5 0.4 0.4 0.4 0.4]; 
 % Ess 는 분산이 클 때 성능향상은 0.6~0.7에 근접 
@@ -42,22 +40,16 @@ pfopti_roughening = [];
 for a = 1:alphaMax
     alpha = 0.1*a;
     pf_data = struct();
-    pf_data.estimatedPos = zeros(2, params.numPoints, params.pfIterations, params.numNoise);
-    % pf_data.RMSE = zeros(params.numNoise, 1);
+    pf_data.estimatedPos = zeros(2, numPoints, pfIterations, numNoise);
 
-    for countNoise = 1:params.numNoise
-        pf = ParticleFilter(countNoise, params.numParticles); % 클래스 객체 불러오기
-        % pf_particles = zeros(2, params.numParticles, params.numPoints, params.numIterations);
-        % pf_vel = zeros(size(pf_particles));
-        % pf_weights = params.numParticles\ones(params.numParticles, params.numPoints, params.numIterations);
-        % pf_estimatedPos = zeros(2, params.numPoints, params.numIterations);
-        % pf_errorPos = zeros(size(pf_estimatedPos));
+    for countNoise = 1:numNoise
+        pf = ParticleFilter(countNoise, numParticles);
 
-        for countIter = 1:params.pfIterations
+        for countIter = 1:pfIterations
             particles_prev = [];
             vel_prev = [];
-            weights_curr = ones(params.numParticles, 1) / params.numParticles; % 초기 가중치 균일분포
-            for countPoint = 2:params.numPoints
+            weights_curr = ones(numParticles, 1) / numParticles;
+            for countPoint = 2:numPoints
                 meas = z(:, countIter, countPoint, countNoise); % 변수가 복잡해서 따로 변수에 저장함.
                 Rmat = R(:, :, countIter, countPoint, countNoise);
 
@@ -73,22 +65,16 @@ for a = 1:alphaMax
                     vel_prev = p_curr - p_prev; % 초기 속도 추정 (2 x N)
 
                 else
-                    % particles_pred = ...
-                    %     pf.predict(particles_prev, vel_prev, 1); % 예측 : 그냥 예측 프로세스 노이즈 들어감 , f(x,u,w_k)
                     particles_pred = ...
-                    pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise)); % 예측 : 스텝에 따라 process 노이즈를 줄여가면서 (gamma 최적화)
+                    pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise));
                     weights_upd = ...
-                        pf.update(particles_pred, weights_curr, meas, params.H, Rmat); % 측정값 반영(p(y|x), 가중치 업데이트는 여러방법이 있음 최적화 필요)
+                        pf.update(particles_pred, weights_curr, meas, H, Rmat);
                     est = ...
-                        pf.estimate(particles_pred, weights_upd); % 각 파티클의 가중치를 가지고 가중합 (posteriori)
-                    % [particles_res,weights_upd] = ...
-                    %     pf.resampling(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
-                    % [particles_res,weights_upd] = ...
-                    %     pf.resamplingEss(particles_pred, weights_upd); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+                        pf.estimate(particles_pred, weights_upd);
                     [particles_res,weights_upd] = ...
-                        pf.resampling_param(particles_pred, weights_upd, countPoint,alpha); % 리샘플링 (기본적으로 SIR 적용, 최적화 가능성 있음)
+                        pf.resampling_param(particles_pred, weights_upd, countPoint,alpha);
                     vel_new = ...
-                        est*ones(1,params.numParticles) - particles_prev;% 속도 추정: 추정값 - 이전 리샘플링 파티클(파티클 빈곤현상 있을 수 있음) roughening 해볼 수 있음.
+                        est*ones(1,numParticles) - particles_prev;
 
                     momentum = 0.5; % 관성 개념 도입 비율`
                     vel_new = vel_prev*(1-momentum) + vel_new*momentum; % 속도에 관성 개념 도입 (이전 속도와 새로 계산한 속도의 평균)
@@ -109,21 +95,21 @@ end
 %}
 
 %{
-kf1_RMSE = zeros(params.numNoise, alphaMax);
+kf1_RMSE = zeros(numNoise, alphaMax);
 for a = 1:alphaMax
     alpha = 0.1*a;
     kf1_data = struct();
-    kf1_data.estimatedPos = zeros(2, params.numPoints, params.numIterations, params.numNoise);
-    kf1_data.errCov = zeros(2, 2, params.numPoints, params.numIterations, params.numNoise);
+    kf1_data.estimatedPos = zeros(2, numPoints, numIterations, numNoise);
+    kf1_data.errCov = zeros(2, 2, numPoints, numIterations, numNoise);
     kf1_data.vel = zeros(size(kf1_data.estimatedPos));
-    kf1_data.RMSE = zeros(params.numNoise, alphaMax);
+    kf1_data.RMSE = zeros(numNoise, alphaMax);
 
 
-    for countNoise = 1:params.numNoise
+    for countNoise = 1:numNoise
         % for countNoise = 5
-        kf = KalmanFilter1(countNoise, params.H);
-        for countIter = 1:params.numIterations
-            for countPoint = 2:params.numPoints
+        kf = KalmanFilter1(countNoise, H);
+        for countIter = 1:numIterations
+            for countPoint = 2:numPoints
                 if countPoint < 3
                     kf1_data.estimatedPos(:, countPoint-1, countIter, countNoise) = toaPos(:, countIter, countPoint-1, countNoise);
                     kf1_data.estimatedPos(:, countPoint, countIter, countNoise) = toaPos(:, countIter, countPoint, countNoise);

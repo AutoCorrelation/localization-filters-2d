@@ -23,6 +23,12 @@ classdef KalmanFilter
             xhat = x + B * u + obj.bias;
             Phat = P + obj.pNoiseCov;
         end
+
+        function [xhat, Phat] = predict_decayQ(obj,x, P, B, u, step, optimal_gamma)
+            xhat = x + B * u + obj.bias;
+            Phat = P + obj.pNoiseCov * exp(-optimal_gamma*(step-3));
+            % Phat = P + obj.pNoiseCov * optimal_gamma^(step-3);
+        end
         
 
         function obj = update(obj,P, R)
