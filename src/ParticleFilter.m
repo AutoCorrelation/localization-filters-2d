@@ -5,14 +5,19 @@ classdef ParticleFilter
         numParticles
         opti_w_gamma
         Q
+        noiseInd
+        noiseVar = [0.01 0.1 1 10 100]
+        processBias
     end
 
     methods
         function obj = ParticleFilter(Noise, numParticles)
             obj.numParticles = numParticles;
+            obj.noiseInd = Noise;
             obj.processNoise = load(['../data/processNoise',num2str(Noise),'.csv']);
             obj.toaNoise = load(['../data/toaNoise',num2str(Noise),'.csv']);
             obj.Q = load(['../data/Q', num2str(Noise), '.csv']);
+            obj.processBias = load(['../data/processBias', num2str(Noise), '.csv']);
         end
 
 
@@ -21,13 +26,15 @@ classdef ParticleFilter
             % Vectorized: sample noise indices and add to state
             indices = ceil(size(obj.toaNoise, 2) * rand(1, obj.numParticles));
             y = x + obj.toaNoise(:, indices);
+            % y = x + sqrt(obj.noiseVar(obj.noiseInd)) * randn(2, obj.numParticles);
         end
 
         function y = predict(obj, x, B, u)
             % Vectorized: predict with velocity and process noise
             indices = ceil(size(obj.processNoise, 2) * rand(1, obj.numParticles));
             noise = obj.processNoise(:, indices);
-            y = x + B .* u + noise;
+            y = x + B .* u + noise + obj.processBias;
+            % y = x + B .* u + noise;
         end
 
         function y = predictParam(obj, x, B, u, countStep, gamma)
@@ -48,8 +55,6 @@ classdef ParticleFilter
             y = y / sum(y);
             y = y(:);  % Ensure column vector output
         end
-
-
 
         function y = estimate(~, x, w)
             % Vectorized: weighted sum of particles
@@ -96,9 +101,6 @@ classdef ParticleFilter
             sigma = K * D * N^(-1/dx);
             y = x + sigma .* randn(size(x));
         end
-
-
-
 
         function y = updateParam(~, x, w, z, pinvH, R, gamma)
             % Vectorized: update with multivariate normal PDF across particles

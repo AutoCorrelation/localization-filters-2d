@@ -8,7 +8,7 @@
 
 % Env = Env(1e5);
 % Env.preSimulate();
-% 
+
 % % load data
 % load('../data/z.mat');
 % load('../data/toaPos.mat');
@@ -16,7 +16,7 @@
 %% test
 RMSE_obj = RMSE();
 % parameters
-numParticles = 1000;
+numParticles = 5000;
 numIterations = 1e3;
 pfIterations = 1e3;
 numPoints = size(toaPos, 3);
@@ -48,7 +48,7 @@ pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.2];
 % Initialize parpool if not already running
 poolobj = gcp('nocreate');
 if isempty(poolobj)
-    parpool(10);  % Use 4 workers; adjust based on your system
+    parpool(4);  % Use 4 workers; adjust based on your system
 end
 
 tic;
@@ -77,6 +77,7 @@ parfor countNoise = 1:numNoise
                 particles_prev = p_curr;
                 vel_prev = p_curr - p_prev;
             else
+                % particles_pred = pf.predict(particles_prev, vel_prev, 1);
                 particles_pred = pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise));
                 weights_upd = pf.update(particles_pred, weights_curr, meas, H, Rmat);
                 est = pf.estimate(particles_pred, weights_upd);
@@ -222,6 +223,6 @@ fprintf('\n=== RMSE Comparison ===\n');
 fprintf('Noise Level | ToA    | KF     | KF1    | PF     | \n');
 fprintf('------------------------------------------------\n');
 for i = 1:numNoise
-    fprintf('%.2e   | %.4f | %.4f | %.4f | %.4f\n', ...
+    fprintf('%.0e   | %.4f | %.4f | %.4f | %.4f\n', ...
         noisevalue(i), toaRMSE(i), kf_RMSE(i), kf1_RMSE(i), pf_RMSE(i));
 end
