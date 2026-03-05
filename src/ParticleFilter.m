@@ -8,6 +8,7 @@ classdef ParticleFilter
         noiseInd
         noiseVar = [0.01 0.1 1 10 100]
         processBias
+        anchorPos = [0, 10; 0, 0; 10, 0; 10, 10]  % Match Env.m anchor positions: [0 0 10 10; 10 0 0 10]'
     end
 
     methods
@@ -43,6 +44,7 @@ classdef ParticleFilter
             noise = obj.processNoise(:, indices);
             decay = exp(-gamma * (countStep - 2));
             y = x + B .* u + noise * decay;
+            % y = x + B .* u + noise * decay + obj.processBias;
         end
 
         function y = update(~, x, w, z, H, R)
@@ -51,9 +53,39 @@ classdef ParticleFilter
             errors = z - H * x;  % (M x N) matrix
             Rinv = R \ eye(size(R));  % Precompute inverse once
             distances = sum(errors .* (Rinv * errors), 1);  % Element-wise squared Mahalanobis
-            y = (w(:)' .* exp(-0.5 * distances));
+            y = (w(:)' .* exp(-0.5 * distances)) + 1e-300;  % Avoid zero weights
             y = y / sum(y);
             y = y(:);  % Ensure column vector output
+        end
+
+        function weight = updateNonLinear(obj, x, w, z)
+            % Non-linear update using ranging measurements (ToA)
+            % x: 2 x N (particle states)
+            % w: N x 1 (particle weights)
+            % z: 4 x 1 (ranging measurements to 4 anchors)
+            % weight: N x 1 (updated weights)
+            
+            y_pred = obj.H_nonlinear(x);  % 4 x N predicted rangings
+            R = diag(obj.noiseVar(obj.noiseInd) * ones(1, 4));  % 4 x 4 covariance
+            errors = z - y_pred;  % 4 x N measurement residuals
+            Rinv = inv(R);  % 4 x 4 inverse covariance
+            
+            % Correct Mahalanobis distance: sum((R^-1 * errors) .* errors, 1)
+            distances = sum((Rinv * errors) .* errors, 1);  % 1 x N
+            
+            weight = w(:) .* exp(-0.5 * distances') + 1e-300;  % N x 1
+            weight = weight / sum(weight);  % Normalize
+            weight = weight(:);  % Ensure column vector output
+        end
+
+        function y = H_nonlinear(obj, x)
+            % x: 2 x N, anchorPos: 4 x 2
+            y = zeros(4, obj.numParticles);
+            for i = 1:4
+                dx = x(1, :) - obj.anchorPos(i, 1);
+                dy = x(2, :) - obj.anchorPos(i, 2);
+                y(i, :) = sqrt(dx.^2 + dy.^2);
+            end
         end
 
         function y = estimate(~, x, w)
@@ -278,5 +310,8 @@ classdef ParticleFilter
             m = m / (1 - beta1);
             s = s / (1 - beta2);
         end
+
+
     end
 end
+
