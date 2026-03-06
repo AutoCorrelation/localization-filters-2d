@@ -34,8 +34,8 @@ classdef ParticleFilter
             % Vectorized: predict with velocity and process noise
             indices = ceil(size(obj.processNoise, 2) * rand(1, obj.numParticles));
             noise = obj.processNoise(:, indices);
-            y = x + B .* u + noise + obj.processBias;
-            % y = x + B .* u + noise;
+            % y = x + B .* u + noise + obj.processBias;
+            y = x + B .* u + noise;
         end
 
         function y = predictParam(obj, x, B, u, countStep, gamma)
@@ -66,9 +66,8 @@ classdef ParticleFilter
             % weight: N x 1 (updated weights)
             
             y_pred = obj.H_nonlinear(x);  % 4 x N predicted rangings
-            R = diag(obj.noiseVar(obj.noiseInd) * ones(1, 4));  % 4 x 4 covariance
+            Rinv = diag(obj.noiseVar(obj.noiseInd) \ ones(1, 4)) / 3;  % 4 x 4 covariance
             errors = z - y_pred;  % 4 x N measurement residuals
-            Rinv = inv(R);  % 4 x 4 inverse covariance
             
             % Correct Mahalanobis distance: sum((R^-1 * errors) .* errors, 1)
             distances = sum((Rinv * errors) .* errors, 1);  % 1 x N

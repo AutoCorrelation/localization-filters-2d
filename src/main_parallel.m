@@ -6,20 +6,18 @@
 % close all;
 % clc;
 
-% % Env = Env(1e5);
-% % Env.preSimulate();
+% Env = Env(1e5);
+% Env.preSimulate();
 
-% % % load data
+% % % % load data
 % load('../data/z.mat');
 % load('../data/toaPos.mat');
 % load('../data/R.mat');
 % load('../data/ranging.mat');
 %% test
-RMSE_obj = RMSE();
 % parameters
-numParticles = 500;
+numParticles = 0.5e3;
 numIterations = 1e3;
-pfIterations = 1e3;
 numPoints = size(toaPos, 3);
 numNoise = size(toaPos, 4);
 H = [...
@@ -34,12 +32,15 @@ H = [...
 toaPosition = zeros(2, numPoints, numIterations, numNoise);
 for countNoise = 1:numNoise
     for countIter = 1:numIterations
-        for countPoint = 2:numPoints
+        for countPoint = 1:numPoints
             toaPosition(:, countPoint, countIter, countNoise) = toaPos(:,countIter,countPoint,countNoise);
         end
     end
 end
-toaRMSE = RMSE_obj.getRMSE(toaPosition);
+toaRMSE = zeros(numNoise, 1);
+for countNoise = 1:numNoise
+    toaRMSE(countNoise) = rmsev(toaPosition(:, :, :, countNoise), 3);
+end
 
 %% Initialize parpool if not already running
 poolobj = gcp('nocreate');
@@ -56,11 +57,11 @@ pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.2];
 tic;
 
 parfor countNoise = 1:numNoise
-    pf_estimatedPos = zeros(2, numPoints, pfIterations);
+    pf_estimatedPos = zeros(2, numPoints, numIterations);
     
     pf = ParticleFilter(countNoise, numParticles);
     
-    for countIter = 1:pfIterations
+    for countIter = 1:numIterations
         particles_prev = [];
         vel_prev = [];
         weights_curr = ones(numParticles, 1) / numParticles;
@@ -94,14 +95,7 @@ parfor countNoise = 1:numNoise
         end
     end
     
-    % Compute RMSE for this noise level
-    rmse_temp = 0;
-    for countIter = 1:pfIterations
-        for countPoint = 1:numPoints
-            rmse_temp = rmse_temp + norm(pf_estimatedPos(:, countPoint, countIter) - [countPoint; countPoint]);
-        end
-    end
-    pf_RMSE(countNoise) = rmse_temp / (numPoints * pfIterations);
+    pf_RMSE(countNoise) = rmsev(pf_estimatedPos, 3);
     
     pf_data_all{countNoise} = pf_estimatedPos;
 end
@@ -112,24 +106,20 @@ fprintf('PF (parallel) completed in %.2f seconds\n', pf_time);
 %% Particle Filter nonLinear
 pf_nonlinear_data_all = cell(numNoise, 1);
 pf_nonlinear_RMSE = zeros(numNoise, 1);
-% pfopti_w_gamma = [0.6 0.6 0.4 0.2 0.2];
 
 tic;
 
 parfor countNoise = 1:numNoise
-    pf_estimatedPos = zeros(2, numPoints, pfIterations);
+    pf_estimatedPos = zeros(2, numPoints, numIterations);
     
     pf = ParticleFilter(countNoise, numParticles);
     
-    for countIter = 1:pfIterations
+    for countIter = 1:numIterations
         particles_prev = [];
         vel_prev = [];
         weights_curr = ones(numParticles, 1) / numParticles;
         
         for countPoint = 2:numPoints
-            meas = z(:, countIter, countPoint, countNoise);
-            Rmat = R(:, :, countIter, countPoint, countNoise);
-
             if countPoint < 3
                 pf_estimatedPos(:, countPoint-1, countIter) = toaPos(:, countIter, countPoint-1, countNoise);
                 pf_estimatedPos(:, countPoint, countIter) = toaPos(:, countIter, countPoint, countNoise);
@@ -139,8 +129,8 @@ parfor countNoise = 1:numNoise
                 particles_prev = p_curr;
                 vel_prev = p_curr - p_prev;
             else
-                % particles_pred = pf.predict(particles_prev, vel_prev, 1);
-                particles_pred = pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise));
+                particles_pred = pf.predict(particles_prev, vel_prev, 1);
+                % particles_pred = pf.predictParam(particles_prev, vel_prev, 1, countPoint, pfopti_w_gamma(countNoise));
                 weights_upd = pf.updateNonLinear(particles_pred, weights_curr, ranging(:, countIter, countPoint, countNoise));
                 est = pf.estimate(particles_pred, weights_upd);
                 [particles_res, weights_upd] = pf.resamplingEss(particles_pred, weights_upd);
@@ -155,14 +145,7 @@ parfor countNoise = 1:numNoise
         end
     end
     
-    % Compute RMSE for this noise level
-    rmse_temp = 0;
-    for countIter = 1:pfIterations
-        for countPoint = 1:numPoints
-            rmse_temp = rmse_temp + norm(pf_estimatedPos(:, countPoint, countIter) - [countPoint; countPoint]);
-        end
-    end
-    pf_nonlinear_RMSE(countNoise) = rmse_temp / (numPoints * pfIterations);
+    pf_nonlinear_RMSE(countNoise) = rmsev(pf_estimatedPos, 3);
     
     pf_nonlinear_data_all{countNoise} = pf_estimatedPos;
 end
@@ -199,14 +182,7 @@ parfor countNoise = 1:numNoise
         end
     end
     
-    % Compute RMSE for this noise level
-    rmse_temp = 0;
-    for countIter = 1:numIterations
-        for countPoint = 1:numPoints
-            rmse_temp = rmse_temp + norm(kf_data_noise.estimatedPos(:, countPoint, countIter) - [countPoint; countPoint]);
-        end
-    end
-    kf_RMSE(countNoise) = rmse_temp / (numPoints * numIterations);
+    kf_RMSE(countNoise) = rmsev(kf_data_noise.estimatedPos, 3);
     
     kf_data_all{countNoise} = kf_data_noise;
 end
@@ -244,14 +220,7 @@ parfor countNoise = 1:numNoise
         end
     end
     
-    % Compute RMSE for this noise level
-    rmse_temp = 0;
-    for countIter = 1:numIterations
-        for countPoint = 1:numPoints
-            rmse_temp = rmse_temp + norm(kf1_data_noise.estimatedPos(:, countPoint, countIter) - [countPoint; countPoint]);
-        end
-    end
-    kf1_RMSE(countNoise) = rmse_temp / (numPoints * numIterations);
+    kf1_RMSE(countNoise) = rmsev(kf1_data_noise.estimatedPos, 3);
     
     kf1_data_all{countNoise} = kf1_data_noise;
 end
