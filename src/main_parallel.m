@@ -16,7 +16,7 @@ load('../data/R.mat');
 load('../data/ranging.mat');
 %% test
 % parameters
-numParticles = 0.5e3;
+numParticles = 1e3;
 numIterations = 1e3;
 numPoints = size(toaPos, 3);
 numNoise = size(toaPos, 4);
