@@ -29,14 +29,9 @@ H = [...
     0, 20];
 
 %% TOA (sequential - no benefit from parallelization)
-toaPosition = zeros(2, numPoints, numIterations, numNoise);
-for countNoise = 1:numNoise
-    for countIter = 1:numIterations
-        for countPoint = 1:numPoints
-            toaPosition(:, countPoint, countIter, countNoise) = toaPos(:,countIter,countPoint,countNoise);
-        end
-    end
-end
+% toaPos is (2, numIterations, numPoints, numNoise); rearrange to
+% (2, numPoints, numIterations, numNoise) via a single permute call.
+toaPosition = permute(toaPos, [1, 3, 2, 4]);
 toaRMSE = zeros(numNoise, 1);
 for countNoise = 1:numNoise
     toaRMSE(countNoise) = rmsev(toaPosition(:, :, :, countNoise), 3);

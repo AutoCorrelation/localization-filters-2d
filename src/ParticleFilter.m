@@ -51,8 +51,9 @@ classdef ParticleFilter
             % Vectorized: compute likelihood for all particles
             R = R + 1e-8 * eye(size(R));
             errors = z - H * x;  % (M x N) matrix
-            Rinv = R \ eye(size(R));  % Precompute inverse once
-            distances = sum(errors .* (Rinv * errors), 1);  % Element-wise squared Mahalanobis
+            % Solve R * v = errors directly instead of computing the full inverse
+            Rinv_errors = R \ errors;  % More efficient and numerically stable than R\eye*errors
+            distances = sum(errors .* Rinv_errors, 1);  % Element-wise squared Mahalanobis
             y = (w(:)' .* exp(-0.5 * distances)) + 1e-300;  % Avoid zero weights
             y = y / sum(y);
             y = y(:);  % Ensure column vector output
@@ -66,11 +67,11 @@ classdef ParticleFilter
             % weight: N x 1 (updated weights)
             
             y_pred = obj.H_nonlinear(x);  % 4 x N predicted rangings
-            Rinv = diag(obj.noiseVar(obj.noiseInd) \ ones(1, 4)) / 3;  % 4 x 4 covariance
             errors = z - y_pred;  % 4 x N measurement residuals
             
-            % Correct Mahalanobis distance: sum((R^-1 * errors) .* errors, 1)
-            distances = sum((Rinv * errors) .* errors, 1);  % 1 x N
+            % R is a scaled identity: (3 * noiseVar) * I_4, so R^{-1} scales by 1/(3*noiseVar)
+            inv_scale = 1 / (3 * obj.noiseVar(obj.noiseInd));
+            distances = inv_scale * sum(errors.^2, 1);  % 1 x N
             
             weight = w(:) .* exp(-0.5 * distances') + 1e-300;  % N x 1
             weight = weight / sum(weight);  % Normalize
@@ -79,12 +80,10 @@ classdef ParticleFilter
 
         function y = H_nonlinear(obj, x)
             % x: 2 x N, anchorPos: 4 x 2
-            y = zeros(4, obj.numParticles);
-            for i = 1:4
-                dx = x(1, :) - obj.anchorPos(i, 1);
-                dy = x(2, :) - obj.anchorPos(i, 2);
-                y(i, :) = sqrt(dx.^2 + dy.^2);
-            end
+            % Use implicit broadcasting: anchorPos(:,1) is 4x1, x(1,:) is 1xN -> 4xN
+            dx = x(1, :) - obj.anchorPos(:, 1);  % 4 x N
+            dy = x(2, :) - obj.anchorPos(:, 2);  % 4 x N
+            y = sqrt(dx.^2 + dy.^2);
         end
 
         function y = estimate(~, x, w)
@@ -134,14 +133,17 @@ classdef ParticleFilter
         end
 
         function y = updateParam(~, x, w, z, pinvH, R, gamma)
-            % Vectorized: update with multivariate normal PDF across particles
+            % Vectorized: update with multivariate normal likelihood across all particles
             R = R + 1e-6 * eye(size(R));
-            N = size(x, 2);
-            y = zeros(1, N);
             Rcov = R * gamma;
-            for k = 1:N
-                y(k) = w(k) * mvnpdf(z, pinvH * x(:, k), Rcov);
-            end
+            % Compute predicted observations and residuals for all particles at once
+            residuals = z(:) - pinvH * x;  % 6 x N
+            % Solve Rcov * v = residuals (avoids explicit matrix inverse)
+            Rcov_inv_residuals = Rcov \ residuals;  % 6 x N
+            log_likelihoods = -0.5 * sum(residuals .* Rcov_inv_residuals, 1);  % 1 x N
+            % Subtract maximum for numerical stability before exponentiation
+            log_likelihoods = log_likelihoods - max(log_likelihoods);
+            y = w(:)' .* exp(log_likelihoods);
             y = y / sum(y);
         end
 
@@ -210,16 +212,10 @@ classdef ParticleFilter
             Ess = 1 / sum(w.^2);
             if Ess < N/2
                 positions = (rand + (0:N-1)) / N;
-                indexes = zeros(1, N);
-                cumulative_sum = cumsum(w);
-                i = 1;
-                for j = 1:N
-                    while positions(j) > cumulative_sum(i)
-                        i = i + 1;
-                    end
-                    indexes(j) = i;
-                end
-                y = x(:, indexes); % Resample particles
+                c = cumsum(w(:));
+                c(end) = 1;  % Guard against floating-point rounding
+                indexes = discretize(positions, [0; c]);
+                y = x(:, indexes);
             else
                 y = x;
             end
@@ -231,16 +227,10 @@ classdef ParticleFilter
             Ess = 1 / sum(w.^2);
             if Ess < N/2
                 positions = ((0:N-1) + rand(1, N)) / N;
-                indexes = zeros(1, N);
-                cumulative_sum = cumsum(w);
-                i = 1;
-                for j = 1:N
-                    while positions(j) > cumulative_sum(i)
-                        i = i + 1;
-                    end
-                    indexes(j) = i;
-                end
-                y = x(:, indexes); % Resample particles
+                c = cumsum(w(:));
+                c(end) = 1;  % Guard against floating-point rounding
+                indexes = discretize(positions, [0; c]);
+                y = x(:, indexes);
             else
                 y = x;
             end
@@ -277,15 +267,13 @@ classdef ParticleFilter
             Qmax = Qload(1);
             norms = sqrt(sum(obj.processNoise.^2, 1));
 
-            % Replace noise exceeding threshold with alternating pattern
+            % Alternating sign pattern (+1, -1, +1, ...) for all particles
             sign_pattern = repmat([1; -1], 1, ceil(obj.numParticles/2));
             sign_pattern = sign_pattern(1:obj.numParticles);
 
-            for i = 1:obj.numParticles
-                if norms(i) > Qmax
-                    obj.processNoise(:, i) = [1; -1] * sqrt(Qmax) * sign_pattern(i);
-                end
-            end
+            % Replace high-norm particles using logical indexing (no loop)
+            mask = norms > Qmax;
+            obj.processNoise(:, mask) = [1; -1] * (sqrt(Qmax) .* sign_pattern(mask));
         end
 
         function [m, s] = belief(~, z, H, xparticles, m, s)
