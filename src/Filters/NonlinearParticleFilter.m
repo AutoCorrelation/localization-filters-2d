@@ -1,6 +1,5 @@
-classdef PF
+classdef NonlinearParticleFilter
     properties
-        H
         xHat
         z
         R
@@ -8,14 +7,14 @@ classdef PF
         toaNoise
         numParticles
         noiseScale
+        anchorPos
     end
 
     methods
-        function obj = PF(data, config, noiseIdx)
-            obj.H = config.H;
+        function obj = NonlinearParticleFilter(data, config, noiseIdx)
             obj.xHat = squeeze(data.x_hat_LLS(:, :, :, noiseIdx));
-            obj.z = squeeze(data.z_LLS(:, :, :, noiseIdx));
-            obj.R = squeeze(data.R_LLS(:, :, :, :, noiseIdx));
+            obj.z = squeeze(data.ranging(:, :, :, noiseIdx));
+            obj.R = config.noiseVariance(noiseIdx) * eye(size(data.ranging, 1));
 
             obj.processNoise = localExtractNoiseBank(data.processNoise, noiseIdx);
             obj.toaNoise = localExtractNoiseBank(data.toaNoise, noiseIdx);
@@ -27,6 +26,12 @@ classdef PF
             end
 
             obj.noiseScale = sqrt(config.noiseVariance(noiseIdx));
+            
+            if isfield(config, 'anchorPos')
+                obj.anchorPos = config.anchorPos;
+            else
+                obj.anchorPos = [0, 10; 0, 0; 10, 0; 10, 10];
+            end
         end
 
         function state = initializeState(obj, numPoints)
@@ -52,9 +57,8 @@ classdef PF
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             particlesPred = state.particlesPrev + state.velPrev + obj.sampleProcess();
 
-            Rmat = obj.R(:, :, pointIdx, iterIdx);
             zNow = obj.z(:, pointIdx, iterIdx);
-            weightsUpd = obj.updateWeightsLinear(particlesPred, state.weights, zNow, Rmat);
+            weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
 
             est = particlesPred * weightsUpd;
             [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
@@ -85,13 +89,34 @@ classdef PF
             noise = obj.processNoise(:, indices);
         end
 
-        function weights = updateWeightsLinear(obj, particles, prevWeights, zNow, Rmat)
-            Rmat = Rmat + 1e-8 * eye(size(Rmat));
-            residual = zNow - obj.H * particles;
-            Rinv = Rmat \ eye(size(Rmat));
-            dist = sum((Rinv * residual) .* residual, 1);
+        function y_pred = H_nonlinear(obj, x)
+            % Nonlinear observation model: compute ranging to each anchor
+            % x: 2 x N (particle positions)
+            % y_pred: 4 x N (predicted ranging measurements)
+            y_pred = zeros(size(obj.anchorPos, 1), obj.numParticles);
+            for i = 1:size(obj.anchorPos, 1)
+                dx = x(1, :) - obj.anchorPos(i, 1);
+                dy = x(2, :) - obj.anchorPos(i, 2);
+                y_pred(i, :) = sqrt(dx.^2 + dy.^2);
+            end
+        end
 
-            weights = prevWeights(:)' .* exp(-0.5 * dist);
+        function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow)
+            % Nonlinear update using ranging measurements (ToA)
+            % particles: 2 x N (particle states)
+            % prevWeights: N x 1 (particle weights)
+            % zNow: 4 x 1 (ranging measurements to 4 anchors)
+            % weights: N x 1 (updated weights)
+            
+            y_pred = obj.H_nonlinear(particles);  % 4 x N predicted rangings
+            numAnchors = size(y_pred, 1);
+            Rinv = eye(numAnchors) / (obj.noiseScale^2) / 3;  % Inverse of R matrix
+            errors = zNow - y_pred;  % 4 x N measurement residuals
+            
+            % Mahalanobis distance: sum((R^-1 * errors) .* errors, 1)
+            distances = sum((Rinv * errors) .* errors, 1);  % 1 x N
+            
+            weights = prevWeights(:)' .* exp(-0.5 * distances);
             weights = weights + 1e-300;
             weights = (weights / sum(weights)).';
         end

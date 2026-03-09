@@ -5,6 +5,7 @@ function config = initializeConfig()
     config.pathData = '../data/';
     config.pathResult = '../result/';
     config.numSamples = 1e5;
+    config.iterations = 1e3;
     config.noiseVariance = [1e-2, 1e-1, 1, 1e1, 1e2];
     config.numPoints = 10;
     config.Anchor = [0 10; 0 0; 10 0; 10 10]';
@@ -16,4 +17,7 @@ function config = initializeConfig()
         20, 20
         0, 20];
     config.pinvH = pinv(config.H);
+
+    config.numParticles = 150;
+    config.decayGamma = [0.6 0.6 0.6 0.4 0.2];
 end

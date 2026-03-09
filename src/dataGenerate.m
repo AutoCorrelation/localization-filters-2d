@@ -32,9 +32,10 @@ parfor i = 1:numNoises
 
     for j = 1:numSamples
         for k = 1:numPoints
-            ranging_temp(:, k, j) = norm([k; k] - Anchor, 1) + sqrt(noiseVar) * randn(4, 1);
+            d = vecnorm([k; k] - Anchor, 2, 1).';   % 4x1
+            ranging_temp(:, k, j) = d + sqrt(noiseVar) * randn(4, 1);
             z_LLS_temp(:, k, j) = [...
-                ranging_temp(1, k, j)^2 - ranging_temp(2, k, j)^2 + 10^2;
+                ranging_temp(1, k, j)^2 - ranging_temp(2, k, j)^2 - 10^2;
                 ranging_temp(1, k, j)^2 - ranging_temp(3, k, j)^2;
                 ranging_temp(1, k, j)^2 - ranging_temp(4, k, j)^2 + 10^2;
                 ranging_temp(2, k, j)^2 - ranging_temp(3, k, j)^2 + 10^2;

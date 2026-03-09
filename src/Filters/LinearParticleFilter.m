@@ -1,4 +1,4 @@
-classdef PF
+classdef LinearParticleFilter
     properties
         H
         xHat
@@ -11,7 +11,7 @@ classdef PF
     end
 
     methods
-        function obj = PF(data, config, noiseIdx)
+        function obj = LinearParticleFilter(data, config, noiseIdx)
             obj.H = config.H;
             obj.xHat = squeeze(data.x_hat_LLS(:, :, :, noiseIdx));
             obj.z = squeeze(data.z_LLS(:, :, :, noiseIdx));
