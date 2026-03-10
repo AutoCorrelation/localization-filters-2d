@@ -1,4 +1,4 @@
-function plotRMSEComparison(noiseVariance, baseline_RMSE, lkf_RMSE, lpf_RMSE, lkf_decayQ_RMSE, nl_pf_RMSE)
+function plotRMSEComparison(noiseVariance, baseline_RMSE, lkf_RMSE, lpf_RMSE, lkf_decayQ_RMSE, nl_pf_RMSE, customnlpf_RMSE)
 % plotRMSEComparison - Plot RMSE results for all filters on a semilogx figure
 % Usage:
 %   plotRMSEComparison(noiseVariance, baseline_RMSE, lkf_RMSE, lpf_RMSE, lkf_decayQ_RMSE, nl_pf_RMSE)
@@ -8,9 +8,10 @@ h = semilogx(noiseVariance, baseline_RMSE, '-o', ...
               noiseVariance, lkf_RMSE, '-s', ...
               noiseVariance, lpf_RMSE, '-^', ...
               noiseVariance, lkf_decayQ_RMSE, '-d', ...
-              noiseVariance, nl_pf_RMSE, '-x');
+              noiseVariance, nl_pf_RMSE, '-x', ...
+              noiseVariance, customnlpf_RMSE, '-p');
 
-legend({'Baseline', 'LinearKF', 'LinearPF', 'LinearKF\_DecayQ', 'NonLinearPF'}, 'Location', 'northwest');
+legend({'Baseline', 'LinearKF', 'LinearPF', 'LinearKF\_DecayQ', 'NonLinearPF', 'CustomNonlinearPF'}, 'Location', 'northwest');
 xlabel('Noise Variance');
 ylabel('RMSE');
 title('RMSE Comparison by Noise Level');

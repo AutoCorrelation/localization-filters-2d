@@ -39,3 +39,7 @@ $$
 $$
 Bootstrap PF : q(x_k|x_{k-1},y_k)=p(x_k|x_{k-1})
 $$
+
+$$
+w_m = w_m p(z_k|z_m^-)
+$$
