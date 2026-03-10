@@ -2,18 +2,18 @@
 % Uses parfor to parallelize across noise levels
 % Each noise level runs independently with its own filter instance
 
-% clear all;
-% close all;
-% clc;
+clear all;
+close all;
+clc;
 
-% Env = Env(1e5);
-% Env.preSimulate();
+Env = Env(1e5);
+Env.preSimulate();
 
-% % % % load data
-% load('../data/z.mat');
-% load('../data/toaPos.mat');
-% load('../data/R.mat');
-% load('../data/ranging.mat');
+% load data
+load('../data/z.mat');
+load('../data/toaPos.mat');
+load('../data/R.mat');
+load('../data/ranging.mat');
 %% test
 % parameters
 numParticles = 0.5e3;
