@@ -1,4 +1,4 @@
-classdef KalmanFilter1
+classdef KalmanFilter
     %KALMANFILTER
     %   Kalman Filtering for 2D TOA
     %   This class implements the Kalman filter algorithm for 2D Time of Arrival (TOA) localization.
@@ -13,13 +13,18 @@ classdef KalmanFilter1
     end
     
     methods
-        function obj = KalmanFilter1(Noise, H)
+        function obj = KalmanFilter(Noise, H)
             obj.pNoiseCov = load(['../data/Q', num2str(Noise), '.csv']);
             obj.bias = load(['../data/processbias', num2str(Noise), '.csv']);
             obj.H = H;
         end
         
-        function [xhat, Phat] = predict(obj,x, P, B, u, step, optimal_gamma)
+        function [xhat, Phat] = predict(obj,x, P, B, u)
+            xhat = x + B * u + obj.bias;
+            Phat = P + obj.pNoiseCov;
+        end
+
+        function [xhat, Phat] = predict_decayQ(obj,x, P, B, u, step, optimal_gamma)
             xhat = x + B * u + obj.bias;
             Phat = P + obj.pNoiseCov * exp(-optimal_gamma*(step-3));
             % Phat = P + obj.pNoiseCov * optimal_gamma^(step-3);

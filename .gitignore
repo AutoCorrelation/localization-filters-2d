@@ -1,6 +1,6 @@
 # Ignore data directory at repository root
-/data/
-
+*.h5
+data/
 __pycache__/
 *.pyc
 
