@@ -1,4 +1,4 @@
-function config = initializeConfig()
+function config = initializeConfig(numParticle)
     %INITIALIZECONFIG Initialize configuration parameters
     %   Returns a struct containing all simulation parameters
     
@@ -18,6 +18,11 @@ function config = initializeConfig()
         0, 20];
     config.pinvH = pinv(config.H);
 
-    config.numParticles = 150;
+    if nargin > 0
+        config.numParticles = numParticle;
+    else
+        config.numParticles = 150;
+    end
+    config.resampleThresholdRatio = 0.5;
     config.decayGamma = [0.6 0.6 0.6 0.4 0.2];
 end

@@ -8,6 +8,7 @@ classdef LinearParticleFilter
         toaNoise
         numParticles
         noiseScale
+        resampleThresholdRatio
     end
 
     methods
@@ -19,12 +20,8 @@ classdef LinearParticleFilter
 
             obj.processNoise = localExtractNoiseBank(data.processNoise, noiseIdx);
             obj.toaNoise = localExtractNoiseBank(data.toaNoise, noiseIdx);
-
-            if isfield(config, 'numParticles')
-                obj.numParticles = config.numParticles;
-            else
-                obj.numParticles = 500;
-            end
+            obj.numParticles = config.numParticles;
+            obj.resampleThresholdRatio = config.resampleThresholdRatio;
 
             obj.noiseScale = sqrt(config.noiseVariance(noiseIdx));
         end
@@ -98,7 +95,7 @@ classdef LinearParticleFilter
 
         function [particlesOut, weightsOut] = resampleEss(obj, particles, weights)
             ess = 1 / sum(weights .^ 2);
-            if ess < obj.numParticles / 2
+            if ess < obj.numParticles * obj.resampleThresholdRatio
                 wtc = cumsum(weights);
                 rpt = rand(obj.numParticles, 1);
                 [~, ind1] = sort([rpt; wtc]);
