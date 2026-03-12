@@ -1,9 +1,9 @@
-# 코드 실행 방법  
-- git clone 후 폴더 디렉토리에 `/data` 폴더 추가  
-- src/`main.m` 파일 실행  
-- 실행 시 do preSimulate? Y/N:  라고 묻는데 `/data` 내 시뮬레이션 데이터가 있으면 N, 초기 실행이라면 Y
+# Problem 
+- Circular-ToA based Localization  
+- ToF를 측정하는데 송신, 수신 시간이 일치. (시간 동기화 or 같은 기기) 즉, Sonar, Rader
+- 각 BS에 붙는 노이즈가 독립이라고 가정 가능. 
 
- # parameter  
+ #parameter  
  |x|number of x|
  |--|--|
  |Particles|5e3|
