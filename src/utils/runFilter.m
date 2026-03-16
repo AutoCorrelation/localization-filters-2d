@@ -54,6 +54,8 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
             filterObj = NonlinearParticleFilter(data, config, noiseIdx);
         case 'customnonlinearparticlefilter'
             filterObj = CustomNonlinearParticleFilter(data, config, noiseIdx);
+        case 'adaptiverparticlefilter'
+            filterObj = AdaptiveRParticleFilter(data, config, noiseIdx);
         case 'baseline'
             filterObj = Baseline(data, config, noiseIdx);
 
