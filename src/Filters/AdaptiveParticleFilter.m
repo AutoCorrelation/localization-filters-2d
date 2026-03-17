@@ -1,30 +1,34 @@
-classdef AdaptiveRParticleFilter < NonlinearParticleFilter
-    % AdaptiveRParticleFilter  잔차의 2차 모멘트(EMA)를 이용한 적응형 R 파티클 필터
+classdef AdaptiveParticleFilter < NonlinearParticleFilter
+    % AdaptiveParticleFilter  AdaBelief 스타일 R-inflation 파티클 필터
     %
     % [수학적 배경]
     %   표준 PF에서는 고정된 R = sigma^2 * I 를 우도 함수에 사용한다.
     %   R을 인위적으로 팽창(inflation)하면 샘플 빈약화(sample impoverishment)에
     %   강인해지지만, 점근적 최적성(asymptotic optimality)을 상실한다.
     %
-    %   이 필터는 매 스텝에서 잔차의 2차 모멘트를 추적해 R을 실시간 스케일링한다.
+    %   이 필터는 매 스텝에서 글로벌 잔차의 2차 모멘트 s_k를 추적하고,
+    %   R_k = R_nom + lambdaR * diag(s_k) 로 관측 공분산을 팽창시킨다.
     %
-    %     e_k   = z_k - H(x̂_k)                      (가중 평균 예측 잔차)
-    %     r̂_k(i) = α·r̂_{k-1}(i) + (1-α)·e_k(i)²    (앵커 i별 분산 EMA 업데이트)
-    %     R_k   = diag(r̂_k(1), ..., r̂_k(n))          (대각 R 재구성)
+    %     e_k    = z_k - H(x̂_k)                            (가중 평균 예측 잔차)
+    %     s_k(i) = beta·s_{k-1}(i) + (1-beta)·e_k(i)^2     (2차 모멘트 EMA)
+    %     R_k    = R_nom + lambdaR * diag(s_k)             (대각 팽창)
     %
     %   이후 가중치 업데이트는 R_k를 이용한 가우시안 우도로 수행한다.
     %     w_i ∝ w_{i-1} · exp(-0.5 · eᵢᵀ R_k⁻¹ eᵢ)
     %
-    % [참고] alpha가 1에 가까울수록 과거 추정치를 강하게 유지(느린 적응),
+    % [참고] beta가 1에 가까울수록 과거 추정치를 강하게 유지(느린 적응),
     %        0에 가까울수록 현재 잔차에 민감하게 반응(빠른 적응).
     %
     % [사용 예]
-    %   filterObj = AdaptiveRParticleFilter(data, config, noiseIdx);        % alpha=0.9
-    %   filterObj = AdaptiveRParticleFilter(data, config, noiseIdx, 0.8);  % alpha=0.8
+    %   filterObj = AdaptiveParticleFilter(data, config, noiseIdx);             % beta=0.99, lambdaR=1.0
+    %   filterObj = AdaptiveParticleFilter(data, config, noiseIdx, 0.8, 2.0);  % beta=0.8, lambdaR=2.0
 
     properties
-        % EMA 망각 인자 (forgetting factor): 0 < alpha < 1
-        alpha   (1,1) double = 0.9
+        % AdaBelief 계수(EMA 망각 인자): 0 < beta < 1
+        beta    (1,1) double = 0.99
+
+        % R inflation 강도: R_k = R_nom + lambdaR * diag(s_k)
+        lambdaR (1,1) double = 1.0
 
         % R 대각 요소의 하한 / 상한 (수치 안정성 보장)
         rFloor  (1,1) double = 1e-6
@@ -32,13 +36,17 @@ classdef AdaptiveRParticleFilter < NonlinearParticleFilter
     end
 
     methods
-        function obj = AdaptiveRParticleFilter(data, config, noiseIdx, alpha)
+        function obj = AdaptiveParticleFilter(data, config, noiseIdx, beta, lambdaR)
             % 생성자
-            %   alpha (선택): EMA 망각 인자, 기본값 0.9
+            %   beta (선택): AdaBelief 계수, 기본값 0.99
+            %   lambdaR (선택): R inflation 강도, 기본값 1.0
             obj@NonlinearParticleFilter(data, config, noiseIdx);
 
-            if nargin >= 4 && ~isempty(alpha)
-                obj.alpha = alpha;
+            if nargin >= 4 && ~isempty(beta)
+                obj.beta = beta;
+            end
+            if nargin >= 5 && ~isempty(lambdaR)
+                obj.lambdaR = lambdaR;
             end
         end
 
@@ -46,10 +54,12 @@ classdef AdaptiveRParticleFilter < NonlinearParticleFilter
             % 부모 클래스 state + 적응형 R 상태 추가
             state = initializeState@NonlinearParticleFilter(obj, numPoints);
 
-            % 초기 diagR: 명목 noiseVariance 기반
+            % 명목 R 대각 및 2차 모멘트 상태 초기화
             numAnchors = size(obj.anchorPos, 1);
             nominalVar = obj.noiseScale^2;                    % noiseVariance(noiseIdx)
-            state.diagR = nominalVar * ones(numAnchors, 1);   % 앵커별 분산 (numAnchors × 1)
+            state.nominalDiagR = nominalVar * ones(numAnchors, 1);
+            state.sMoment = zeros(numAnchors, 1);
+            state.diagR = state.nominalDiagR;
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
@@ -73,10 +83,13 @@ classdef AdaptiveRParticleFilter < NonlinearParticleFilter
             e = zNow - yPredWeighted;                                  % numAnchors × 1
 
             % -----------------------------------------------------------
-            % 4. 잔차 2차 모멘트(분산) EMA 업데이트
-            %      r̂(i) ← α·r̂(i) + (1-α)·e(i)²
+            % 4. AdaBelief 2차 모멘트 업데이트
+            %      s(i) ← beta·s(i) + (1-beta)·e(i)^2
             % -----------------------------------------------------------
-            state.diagR = obj.alpha * state.diagR + (1 - obj.alpha) * (e .^ 2);
+            state.sMoment = obj.beta * state.sMoment + (1 - obj.beta) * (e .^ 2);
+
+            % R inflation: R_k = R_nom + lambdaR * diag(s_k)
+            state.diagR = state.nominalDiagR + obj.lambdaR * state.sMoment;
 
             % 수치 안정성: 대각 요소 클리핑
             state.diagR = min(max(state.diagR, obj.rFloor), obj.rCeil);

@@ -42,7 +42,7 @@ classdef NonlinearParticleFilter < LinearParticleFilter
         function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow)
             yPred = obj.H_nonlinear(particles);
             numAnchors = size(yPred, 1);
-            Rinv = eye(numAnchors) / (obj.noiseScale^2) / 4;
+            Rinv = eye(numAnchors) / (obj.noiseScale^2);
             errors = zNow - yPred;
             distances = sum((Rinv * errors) .* errors, 1);
 
