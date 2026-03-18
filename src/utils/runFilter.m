@@ -1,4 +1,4 @@
-function [estimatedPos, RMSE] = runFilter(filterClass, data, config)
+function [estimatedPos, metric] = runFilter(filterClass, data, config)
     % Shared parallel execution loop for KF/PF-like filters.
     % The filter class must implement:
     %   initializeState(numPoints)
@@ -14,6 +14,7 @@ function [estimatedPos, RMSE] = runFilter(filterClass, data, config)
 
     estimatedPos = zeros(2, numPoints, numIterations, numNoise);
     RMSE = zeros(numNoise, 1);
+    MAE = zeros(numNoise, 1);
 
     parfor noiseIdx = 1:numNoise
         filterObj = localCreateFilter(filterClass, data, config, noiseIdx);
@@ -32,8 +33,10 @@ function [estimatedPos, RMSE] = runFilter(filterClass, data, config)
         end
 
         estimatedPos(:, :, :, noiseIdx) = estNoise;
-        [RMSE(noiseIdx), ~] = evaluateFilter(estNoise, 3);
+        [RMSE(noiseIdx), MAE(noiseIdx)] = evaluateFilter(estNoise, 3);
     end
+    metric.RMSE = RMSE;
+    metric.MAE = MAE;
 end
 
 function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)

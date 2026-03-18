@@ -21,6 +21,10 @@ ranging_cell = cell(numNoises, 1);
 x_hat_LLS_cell = cell(numNoises, 1);
 z_LLS_cell = cell(numNoises, 1);
 R_LLS_cell = cell(numNoises, 1);
+true_pos = zeros(2, numPoints);
+for k = 1:numPoints
+    true_pos(:, k) = [k; k];
+end
 
 % CV motion model
 parfor i = 1:numNoises
@@ -69,10 +73,11 @@ Q = zeros(2, 2, 5);
 P0 = zeros(2,2,5);
 vel = x_hat_LLS(:,2,:,:) - x_hat_LLS(:,1,:,:);
 vel = squeeze(vel);
-p3 = 3 * ones(size(vel));
-p2 = 2 * ones(size(vel));
+p3 = true_pos(:,3);
+p2 = true_pos(:,2);
 processNoise = p3 - squeeze(x_hat_LLS(:,2,:,:)) - vel;
 toaNoise = p2 - squeeze(x_hat_LLS(:,2,:,:));
+
 eeT_all = cell(5, 1);
 xxT_all = cell(5, 1);
 parfor n = 1:5
