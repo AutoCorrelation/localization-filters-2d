@@ -12,7 +12,7 @@ classdef NonlinearParticleFilter < LinearParticleFilter
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
-            particlesPred = state.particlesPrev + state.velPrev + obj.sampleProcess();
+            particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
             zNow = obj.z(:, pointIdx, iterIdx);
             weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);

@@ -58,6 +58,7 @@ classdef AdaptiveParticleFilter < NonlinearParticleFilter
             numAnchors = size(obj.anchorPos, 1);
             nominalVar = obj.noiseScale^2;                    % noiseVariance(noiseIdx)
             state.nominalDiagR = nominalVar * ones(numAnchors, 1);
+            state.mMoment = zeros(numAnchors, 1);
             state.sMoment = zeros(numAnchors, 1);
             state.diagR = state.nominalDiagR;
         end
@@ -66,7 +67,7 @@ classdef AdaptiveParticleFilter < NonlinearParticleFilter
             % -----------------------------------------------------------
             % 1. 상태 예측 (부모와 동일)
             % -----------------------------------------------------------
-            particlesPred = state.particlesPrev + state.velPrev + obj.sampleProcess();
+            particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
             % -----------------------------------------------------------
             % 2. 측정값
@@ -86,7 +87,8 @@ classdef AdaptiveParticleFilter < NonlinearParticleFilter
             % 4. AdaBelief 2차 모멘트 업데이트
             %      s(i) ← beta·s(i) + (1-beta)·e(i)^2
             % -----------------------------------------------------------
-            state.sMoment = obj.beta * state.sMoment + (1 - obj.beta) * (e .^ 2);
+            state.mMoment = obj.beta * state.mMoment + (1 - obj.beta) * e;
+            state.sMoment = obj.beta * state.sMoment + (1 - obj.beta) * ((state.mMoment- e ).^ 2);
 
             % R inflation: R_k = R_nom + lambdaR * diag(s_k)
             state.diagR = state.nominalDiagR + obj.lambdaR * state.sMoment;

@@ -58,7 +58,14 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
         case 'customnonlinearparticlefilter'
             filterObj = CustomNonlinearParticleFilter(data, config, noiseIdx);
         case 'adaptiveparticlefilter'
-            filterObj = AdaptiveParticleFilter(data, config, noiseIdx);
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = AdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'kldadaptiveparticlefilter', 'abpf', 'agpf'}
+            filterObj = KLDAdaptiveParticleFilter(data, config, noiseIdx);
+        case 'iaemapadaptiveparticlefilter'
+            filterObj = IAEMapAdaptiveParticleFilter(data, config, noiseIdx);
+        case {'variationalbayesianadaptiveupf', 'vbadaptiveupf', 'vbupf'}
+            filterObj = VariationalBayesianAdaptiveUPF(data, config, noiseIdx);
         case 'baseline'
             filterObj = Baseline(data, config, noiseIdx);
 

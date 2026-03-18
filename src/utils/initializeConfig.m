@@ -5,7 +5,7 @@ function config = initializeConfig(numParticle)
     config.pathData = '../data/';
     config.pathResult = '../result/';
     config.numSamples = 1e5;
-    config.iterations = 1e3;
+    config.iterations = 1e4;
     config.noiseVariance = [1e-2, 1e-1, 1, 1e1, 1e2];
     config.numPoints = 10;
     config.Anchor = [0 10; 0 0; 10 0; 10 10]';
@@ -24,5 +24,36 @@ function config = initializeConfig(numParticle)
         config.numParticles = 150;
     end
     config.resampleThresholdRatio = 0.5;
-    config.decayGamma = [0.6 0.6 0.6 0.4 0.2];
+    config.decayGamma = [0.4 0.5 0.5 0.3 0.5];
+
+    % IAE + MAP adaptive PF defaults
+    config.iaeWindowLength = 20;
+    config.iaeQFloor = 1e-6;
+    config.iaeQCeil = 10;
+    config.iaeRegLambda = 1e-8;
+    config.iaeProcessQScale = 1.0;
+    config.mapParameterJitterStd = 1e-3;
+    config.mapFeedbackGain = 0.2;
+
+    % KLD likelihood-adaptive PF defaults (A-BPF / A-GPF style)
+    config.kldThetaMin = 0.0;
+    config.kldThetaMax = 1.0;
+    config.kldRegLambda = 1e-8;
+    config.kldQFloor = 1e-8;
+    config.kldQCeil = 1e3;
+    config.kldThetaFallback = 0.5;
+
+    % VB adaptive UPF defaults
+    config.vbUpfIterations = 3;
+    config.vbUpfAlpha0 = 2.0;
+    config.vbUpfBeta0 = 1.0;
+    config.vbUpfForgettingFactor = 0.99;
+    config.vbUpfTolerance = 1e-3;
+    config.vbUpfRFloor = 1e-6;
+    config.vbUpfRCeil = 1e3;
+    config.vbUpfProposalPriorScale = 1.0;
+    config.vbUpfCovJitter = 1e-8;
+    config.vbUpfUtAlpha = 0.1;
+    config.vbUpfUtBeta = 2.0;
+    config.vbUpfUtKappa = 0.0;
 end

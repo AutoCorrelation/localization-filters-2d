@@ -8,7 +8,6 @@ function [RMSE, MAE] = evaluateFilter(estimatedPos, startPoint)
     %
     % Outputs:
     %   RMSE    - Root Mean Square Error
-    %   metrics - Struct with detailed error metrics (optional)
     %   MAE     - Mean Absolute Error (optional 3rd output)
     
     if nargin < 2 || isempty(startPoint)
@@ -33,24 +32,4 @@ function [RMSE, MAE] = evaluateFilter(estimatedPos, startPoint)
 
     MAE = mean(errors);
     RMSE = sqrt(mean(errors .^ 2));
-    
-    % Optional detailed metrics
-    if nargout > 1
-        maxError = 0;
-        errorByPoint = zeros(numPoints, 1);
-        
-        for iterIdx = 1:numIterations
-            for pointIdx = startPoint:numPoints
-                error = norm(estimatedPos(:, pointIdx, iterIdx) - [pointIdx; pointIdx]);
-                maxError = max(maxError, error);
-                errorByPoint(pointIdx) = errorByPoint(pointIdx) + error;
-            end
-        end
-        
-        metrics.RMSE = RMSE;
-        metrics.MAE = MAE;
-        metrics.MSE = mean(errors .^ 2);
-        metrics.maxError = maxError;
-        metrics.avgErrorByPoint = errorByPoint / numIterations;
-    end
 end

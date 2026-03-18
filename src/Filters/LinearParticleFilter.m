@@ -5,6 +5,7 @@ classdef LinearParticleFilter
         z
         R
         processNoise
+        processBias
         toaNoise
         numParticles
         noiseScale
@@ -19,6 +20,8 @@ classdef LinearParticleFilter
             obj.R = squeeze(data.R_LLS(:, :, :, :, noiseIdx));
 
             obj.processNoise = localExtractNoiseBank(data.processNoise, noiseIdx);
+            processBiasRaw = squeeze(data.processbias(:, noiseIdx));
+            obj.processBias = reshape(processBiasRaw, [2, 1]);
             obj.toaNoise = localExtractNoiseBank(data.toaNoise, noiseIdx);
             obj.numParticles = config.numParticles;
             obj.resampleThresholdRatio = config.resampleThresholdRatio;
@@ -47,7 +50,7 @@ classdef LinearParticleFilter
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
-            particlesPred = state.particlesPrev + state.velPrev + obj.sampleProcess();
+            particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
             Rmat = obj.R(:, :, pointIdx, iterIdx);
             zNow = obj.z(:, pointIdx, iterIdx);

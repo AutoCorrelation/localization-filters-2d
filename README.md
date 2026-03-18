@@ -42,6 +42,9 @@
 |1e+01   | 3.2520 | 2.5257 | 2.5439 | 2.4368 | 2.4826 | 2.3663 |
 |1e+02   | 12.0150 | 6.9834 | 6.8836 | 6.5487 | 4.9665 | 4.5400 |
 
+
+
+
 $$
 Posterior = \frac{Likelihood(Observation) \times Prior(Transition)}{Proposal}
 $$
