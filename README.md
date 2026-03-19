@@ -5,7 +5,7 @@
 
  #parameter  
  |x|number of x|
- |--|--|
+ |:--:|:--:|
  |Particles|5e3|
  |Iteration(KF)|1e3|
  |Iteration(PF)|1e3|  
@@ -41,6 +41,30 @@
 |1e+00   | 1.0076 | 0.8423 | 0.8525 | 0.7908 | 0.8052 | 0.7744 |
 |1e+01   | 3.2520 | 2.5257 | 2.5439 | 2.4368 | 2.4826 | 2.3663 |
 |1e+02   | 12.0150 | 6.9834 | 6.8836 | 6.5487 | 4.9665 | 4.5400 |
+
+=== MAE Comparison ===
+|Noise Level | baseline | LinearKF    | LinearPF    | LinearKF_DecayQ | NonLinearPF | AdaptivePF | KLDAdaptivePF | IAEMapAdaptivePF | VBAdaptiveUPF|
+|:---------:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-------------:|
+| 1e-02   | 0.1003 | 0.0839 | 0.0851 | 0.0780 | 0.0803 | 0.0773 | 0.0757 | 0.0773 | 0.0978 |
+| 1e-01   | 0.3194 | 0.2682 | 0.2720 | 0.2475 | 0.2560 | 0.2479 | 0.2423 | 0.2447 | 0.2653 |
+| 1e+00   | 0.9988 | 0.8377 | 0.8467 | 0.7890 | 0.8036 | 0.7768 | 0.7731 | 0.7796 | 0.8408 |
+| 1e+01   | 3.2259 | 2.5333 | 2.5593 | 2.4590 | 2.4953 | 2.4005 | 2.7874 | 2.5173 | 2.6317 |
+| 1e+02   | 11.7437 | 6.9060 | 6.8950 | 6.1872 | 4.9917 | 4.5508 | 5.3102 | 5.9940 | 5.0979 |  
+
+=== Runtime Comparison (seconds) ===
+ 
+|              Filter               |     Seconds  |
+|:----------------------------------:|:---------------:|
+|'VariationalBayesianAdaptiveUPF'|    281.2891708|
+|'KLDAdaptiveParticleFilter'     |      6.8272801|
+|'IAEMapAdaptiveParticleFilter'  |      6.5274051|
+|'AdaptiveParticleFilter'        |      6.2586038|
+|'NonlinearParticleFilter'       |      6.2259295|
+|'LinearParticleFilter'          |      6.1077178|
+|'LinearKalmanFilter_DecayQ'     |      5.3231369|
+|'LinearKalmanFilter'            |       5.305928|
+|'Baseline'                      |      5.1743559|
+
 
 
 

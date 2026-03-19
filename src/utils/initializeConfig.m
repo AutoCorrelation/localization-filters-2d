@@ -43,17 +43,10 @@ function config = initializeConfig(numParticle)
     config.kldQCeil = 1e3;
     config.kldThetaFallback = 0.5;
 
-    % VB adaptive UPF defaults
-    config.vbUpfIterations = 3;
-    config.vbUpfAlpha0 = 2.0;
-    config.vbUpfBeta0 = 1.0;
-    config.vbUpfForgettingFactor = 0.99;
-    config.vbUpfTolerance = 1e-3;
-    config.vbUpfRFloor = 1e-6;
-    config.vbUpfRCeil = 1e3;
-    config.vbUpfProposalPriorScale = 1.0;
-    config.vbUpfCovJitter = 1e-8;
-    config.vbUpfUtAlpha = 0.1;
-    config.vbUpfUtBeta = 2.0;
-    config.vbUpfUtKappa = 0.0;
+    % Roughening + Prior Editing PF defaults
+    config.rougheningK = 0.2;
+    config.priorSigmaGate = 6.0;
+    config.priorMaxRetry = 30;
+    config.stateLowerBound = [0; 0];
+    config.stateUpperBound = [10; 10];
 end

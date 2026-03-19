@@ -47,6 +47,8 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
 
     className = lower(strtrim(char(filterClass)));
     switch className
+        case 'baseline'
+            filterObj = Baseline(data, config, noiseIdx);
         case 'linearkalmanfilter'
             filterObj = LinearKalmanFilter(data, config, noiseIdx);
         case 'linearkalmanfilter_decayq'
@@ -57,6 +59,16 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
             filterObj = NonlinearParticleFilter(data, config, noiseIdx);
         case 'customnonlinearparticlefilter'
             filterObj = CustomNonlinearParticleFilter(data, config, noiseIdx);
+        case {'regularizedparticlefilter', 'rpf'}
+            filterObj = RegularizedParticleFilter(data, config, noiseIdx);
+        case {'mcmcresamplingparticlefilter', 'mcmcpf'}
+            filterObj = MCMCResamplingParticleFilter(data, config, noiseIdx);
+        case {'auxiliaryparticlefilter', 'apf'}
+            filterObj = AuxiliaryParticleFilter(data, config, noiseIdx);
+        case {'rougheningprioreditingparticlefilter', 'rpeparticlefilter'}
+            filterObj = RougheningPriorEditingParticleFilter(data, config, noiseIdx);
+        case {'ekfparticlefilter', 'ekfpf'}
+            filterObj = EKFParticleFilter(data, config, noiseIdx);
         case 'adaptiveparticlefilter'
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = AdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
@@ -64,10 +76,6 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
             filterObj = KLDAdaptiveParticleFilter(data, config, noiseIdx);
         case 'iaemapadaptiveparticlefilter'
             filterObj = IAEMapAdaptiveParticleFilter(data, config, noiseIdx);
-        case {'variationalbayesianadaptiveupf', 'vbadaptiveupf', 'vbupf'}
-            filterObj = VariationalBayesianAdaptiveUPF(data, config, noiseIdx);
-        case 'baseline'
-            filterObj = Baseline(data, config, noiseIdx);
 
         otherwise
             error('runFilter:UnsupportedFilter', 'Unsupported filterClass: %s', char(filterClass));
