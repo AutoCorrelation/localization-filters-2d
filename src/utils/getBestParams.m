@@ -3,15 +3,15 @@ function [beta, lambdaR] = getBestParams(noiseIdx)
     
     switch noiseIdx
         case 1
-            beta = 0.999; lambdaR = 100;
+            beta = 0.99; lambdaR = 10;
         case 2
-            beta = 0.995; lambdaR = 20;
+            beta = 0.98; lambdaR = 10;
         case 3
-            beta = 0.95; lambdaR = 2;
+            beta = 0.99; lambdaR = 10;
         case 4
-            beta = 0.999; lambdaR = 100;
+            beta = 0.99; lambdaR = 10;
         case 5
-            beta = 0.95; lambdaR = 2.0;
+            beta = 0.98; lambdaR = 5.0;
         otherwise
             % 범위를 벗어나는 경우 기본값 설정
             beta = 0.90; lambdaR = 1.0; 

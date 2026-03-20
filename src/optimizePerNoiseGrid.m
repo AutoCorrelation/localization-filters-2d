@@ -18,7 +18,7 @@ opt.tuneIterations = 200;     % iterations used in train/val grid search
 opt.finalIterations = 500;    % iterations used for final test evaluation
 
 % Grids
-opt.betaGrid = [0.8, 0.9, 0.95, 0.98, 0.99, 0.995, 0.999];
+opt.betaGrid = [0.6, 0.8, 0.9, 0.98, 0.99];
 opt.lambdaRGrid = [0.1, 0.5, 1, 2, 5, 10, 20, 50, 100];
 
 h5File = fullfile(config.pathData, 'simulation_data.h5');

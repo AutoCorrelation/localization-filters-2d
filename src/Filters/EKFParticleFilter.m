@@ -19,6 +19,7 @@ classdef EKFParticleFilter < NonlinearParticleFilter
     properties
         % EKF state covariance for each particle (2 x 2 x numParticles)
         particleCovariances     % Shape: (2, 2, numParticles)
+        initCovariance   (2,2) double = 0.1 * eye(2)
 
         % Process and observation noise covariances
         Q                      (2,2) double   % Process noise covariance
@@ -41,8 +42,7 @@ classdef EKFParticleFilter < NonlinearParticleFilter
 
             % Initialize covariance for each particle (2 x 2 x N)
             % Start with isotropic covariance
-            initCov = 0.1 * eye(2);
-            obj.particleCovariances = repmat(initCov, [1, 1, obj.numParticles]);
+            obj.particleCovariances = repmat(obj.initCovariance, [1, 1, obj.numParticles]);
 
             if isfield(config, 'ekfEnabled')
                 obj.ekfEnabled = config.ekfEnabled;
@@ -53,6 +53,11 @@ classdef EKFParticleFilter < NonlinearParticleFilter
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
+            if pointIdx == 3
+                % Reset once per trajectory/iteration before first recursive update.
+                obj.particleCovariances = repmat(obj.initCovariance, [1, 1, obj.numParticles]);
+            end
+
             % Predict particles (standard PF)
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
@@ -70,14 +75,22 @@ classdef EKFParticleFilter < NonlinearParticleFilter
                 weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
             end
 
+            if obj.ekfDownweight > 0
+                wUniform = ones(obj.numParticles, 1) / obj.numParticles;
+                blend = min(obj.ekfDownweight, 1);
+                weightsUpd = (1 - blend) * weightsUpd + blend * wUniform;
+                weightsUpd = weightsUpd / sum(weightsUpd);
+            end
+
             % Estimate position
             est = particlesPred * weightsUpd;
 
             % Standard PF resampling
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
-
-            % Resample covariances along with particles
-            obj.particleCovariances = obj.resampleCovariancesBatched(obj.particleCovariances, weightsUpd, weightsRes);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
+            if didResample
+                % Keep particle-state and EKF covariance ancestry aligned.
+                obj.particleCovariances = obj.particleCovariances(:, :, idxResampled);
+            end
 
             % Update state
             state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
@@ -182,6 +195,25 @@ classdef EKFParticleFilter < NonlinearParticleFilter
                 % Shape: (2, N)
                 jac = diff ./ ranges;  % (2, N)
                 H_batch(i, :, :) = permute(jac, [3, 1, 2]);  % (1, 2, N) -> reshape to (1, 2, N)
+            end
+        end
+
+        function [particlesOut, weightsOut, idx, didResample] = resampleEssWithIndices(obj, particles, weights)
+            % ESS-triggered resampling with explicit ancestry index output.
+            ess = 1 / sum(weights .^ 2);
+            if ess < obj.numParticles * obj.resampleThresholdRatio
+                wtc = cumsum(weights);
+                rpt = rand(obj.numParticles, 1);
+                [~, ind1] = sort([rpt; wtc]);
+                idx = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
+                particlesOut = particles(:, idx);
+                weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
+                didResample = true;
+            else
+                particlesOut = particles;
+                weightsOut = weights;
+                idx = [];
+                didResample = false;
             end
         end
 
