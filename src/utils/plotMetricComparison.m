@@ -1,9 +1,9 @@
-function figHandle = plotMetricComparison(noiseVariance, baseline_Metric, lkf_Metric, lkf_decayQ_Metric, lpf_Metric, nl_pf_Metric, rpf_Metric, mcmc_Metric, apf_Metric, rougheningPF_Metric, ekf_Metric, adaptivePF_Metric, kldAdaptivePF_Metric, iaeMapAdaptivePF_Metric, runtimeTable, particleCount)
+function figHandle = plotMetricComparison(noiseVariance, baseline_Metric, lkf_Metric, lkf_decayQ_Metric, lpf_Metric, nl_pf_Metric, rpf_Metric, mcmc_Metric, apf_Metric, rougheningPF_Metric, ekf_Metric, adaptivePF_Metric, beliefQShrinkAdaptivePF_Metric, rDiagPriorEditAdaptivePF_Metric, beliefRougheningAdaptivePF_Metric, kldAdaptivePF_Metric, iaeMapAdaptivePF_Metric, runtimeTable, particleCount)
 % plotMetricComparison - Plot MAE and runtime summary in one figure with subplots.
 % Usage:
-%   plotMetricComparison(noiseVariance, baseline_Metric, lkf_Metric, lkf_decayQ_Metric, lpf_Metric, nl_pf_Metric, rpf_Metric, mcmc_Metric, apf_Metric, rougheningPF_Metric, ekf_Metric, adaptivePF_Metric, kldAdaptivePF_Metric, iaeMapAdaptivePF_Metric, runtimeTable, particleCount)
+%   plotMetricComparison(noiseVariance, baseline_Metric, lkf_Metric, lkf_decayQ_Metric, lpf_Metric, nl_pf_Metric, rpf_Metric, mcmc_Metric, apf_Metric, rougheningPF_Metric, ekf_Metric, adaptivePF_Metric, beliefQShrinkAdaptivePF_Metric, rDiagPriorEditAdaptivePF_Metric, beliefRougheningAdaptivePF_Metric, kldAdaptivePF_Metric, iaeMapAdaptivePF_Metric, runtimeTable, particleCount)
 
-filterLabels = {'Baseline', 'LinearKF', 'LinearKF_DecayQ', 'LinearPF', 'NonLinearPF', 'RPF', 'MCMC', 'APF', 'RougheningPF', 'EKF-PF', 'AdaptivePF', 'KLDAdaptivePF', 'IAEMapAdaptivePF'};
+filterLabels = {'Baseline', 'LinearKF', 'LinearKF_DecayQ', 'LinearPF', 'NonLinearPF', 'RPF', 'MCMC', 'APF', 'RougheningPF', 'EKF-PF', 'AdaptivePF', 'BeliefQShrinkAdaptivePF', 'RDiagPriorEditAdaptivePF', 'BeliefRougheningAdaptivePF', 'KLDAdaptivePF', 'IAEMapAdaptivePF'};
 
 figHandle = figure('Name', sprintf('Benchmark (N=%d)', round(particleCount)), 'NumberTitle', 'off');
 
@@ -19,6 +19,9 @@ h = semilogx(noiseVariance, baseline_Metric, '-o', ...
               noiseVariance, rougheningPF_Metric, '-*', ...
               noiseVariance, ekf_Metric, '-o', ...
               noiseVariance, adaptivePF_Metric, '-h', ...
+              noiseVariance, beliefQShrinkAdaptivePF_Metric, '-.', ...
+              noiseVariance, rDiagPriorEditAdaptivePF_Metric, '--', ...
+              noiseVariance, beliefRougheningAdaptivePF_Metric, ':', ...
               noiseVariance, kldAdaptivePF_Metric, '-p', ...
               noiseVariance, iaeMapAdaptivePF_Metric, '-v');
 
@@ -75,6 +78,12 @@ function className = localLegendToClassName(label)
             className = 'EKFParticleFilter';
         case 'AdaptivePF'
             className = 'AdaptiveParticleFilter';
+        case 'BeliefQShrinkAdaptivePF'
+            className = 'BeliefQShrinkAdaptiveParticleFilter';
+        case 'RDiagPriorEditAdaptivePF'
+            className = 'RDiagPriorEditAdaptiveParticleFilter';
+        case 'BeliefRougheningAdaptivePF'
+            className = 'BeliefRougheningAdaptiveParticleFilter';
         case 'KLDAdaptivePF'
             className = 'KLDAdaptiveParticleFilter';
         case 'IAEMapAdaptivePF'

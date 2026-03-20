@@ -27,10 +27,6 @@ classdef EKFParticleFilter < NonlinearParticleFilter
         % EKF-specific parameters
         ekfEnabled      (1,1) logical = true
         ekfDownweight   (1,1) double  = 0.0  % Regularization: blend toward uniform
-
-        % State bounds
-        stateLowerBound (2,1) double = [0; 0]
-        stateUpperBound (2,1) double = [10; 10]
     end
 
     methods
@@ -54,24 +50,11 @@ classdef EKFParticleFilter < NonlinearParticleFilter
             if isfield(config, 'ekfDownweight')
                 obj.ekfDownweight = max(config.ekfDownweight, 0);
             end
-
-            anchorLb = min(obj.anchorPos, [], 1).';
-            anchorUb = max(obj.anchorPos, [], 1).';
-            obj.stateLowerBound = max(anchorLb, [0; 0]);
-            obj.stateUpperBound = anchorUb;
-
-            if isfield(config, 'stateLowerBound')
-                obj.stateLowerBound = reshape(config.stateLowerBound, [2, 1]);
-            end
-            if isfield(config, 'stateUpperBound')
-                obj.stateUpperBound = reshape(config.stateUpperBound, [2, 1]);
-            end
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             % Predict particles (standard PF)
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
-            particlesPred = obj.applyBoundaryClip(particlesPred);
 
             zNow = obj.z(:, pointIdx, iterIdx);
 
@@ -168,7 +151,6 @@ classdef EKFParticleFilter < NonlinearParticleFilter
 
                 % State update
                 particles_upd(:, i) = particles_pred(:, i) + K_i * innov_i;
-                particles_upd(:, i) = obj.applyBoundaryClip(particles_upd(:, i));
 
                 % Covariance update: P^+ = (I - K H) P^-
                 P_upd(:, :, i) = (eye(2) - K_i * H_i) * P_i;
@@ -231,10 +213,5 @@ classdef EKFParticleFilter < NonlinearParticleFilter
             end
         end
 
-        function particlesOut = applyBoundaryClip(obj, particlesIn)
-            % Enforce state bounds
-            particlesOut = max(particlesIn, obj.stateLowerBound);
-            particlesOut = min(particlesOut, obj.stateUpperBound);
-        end
     end
 end

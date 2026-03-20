@@ -72,6 +72,15 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
         case 'adaptiveparticlefilter'
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = AdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'beliefqshrinkadaptiveparticlefilter', 'bqspf'}
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = BeliefQShrinkAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'rdiagprioreditadaptiveparticlefilter', 'rdpepf'}
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = RDiagPriorEditAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'beliefrougheningadaptiveparticlefilter', 'brapf'}
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = BeliefRougheningAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
         case {'kldadaptiveparticlefilter', 'abpf', 'agpf'}
             filterObj = KLDAdaptiveParticleFilter(data, config, noiseIdx);
         case 'iaemapadaptiveparticlefilter'

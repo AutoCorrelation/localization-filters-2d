@@ -5,7 +5,7 @@ function config = initializeConfig(numParticle)
     config.pathData = '../data/';
     config.pathResult = '../result/';
     config.numSamples = 1e5;
-    config.iterations = 1e4;
+    config.iterations = 1e3;
     config.noiseVariance = [1e-2, 1e-1, 1, 1e1, 1e2];
     config.numPoints = 10;
     config.Anchor = [0 10; 0 0; 10 0; 10 10]';
@@ -26,6 +26,11 @@ function config = initializeConfig(numParticle)
     config.resampleThresholdRatio = 0.5;
     config.decayGamma = [0.4 0.5 0.5 0.3 0.5];
 
+    % APF defaults
+    config.apfNonlinearityThreshold = 0.5;
+    config.apfSmoothingAlpha = 1.1;
+    config.apfEnableLookAhead = true;
+
     % IAE + MAP adaptive PF defaults
     config.iaeWindowLength = 20;
     config.iaeQFloor = 1e-6;
@@ -43,10 +48,21 @@ function config = initializeConfig(numParticle)
     config.kldQCeil = 1e3;
     config.kldThetaFallback = 0.5;
 
+    % Belief-Q-shrink adaptive PF defaults
+    config.beliefQShrinkGain = 0.3;
+    config.beliefQShrinkMinScale = 0.35;
+
+    % R-diag prior-edit adaptive PF defaults
+    config.rdiagPriorSigmaGate = 6.0;
+    config.rdiagPriorMaxRetry = 20;
+
+    % Belief-roughening adaptive PF defaults
+    config.beliefRougheningKBase = 0.2;
+    config.beliefRougheningGain = 0.6;
+    config.beliefRougheningKMax = 1.5;
+
     % Roughening + Prior Editing PF defaults
     config.rougheningK = 0.2;
     config.priorSigmaGate = 6.0;
     config.priorMaxRetry = 30;
-    config.stateLowerBound = [0; 0];
-    config.stateUpperBound = [10; 10];
 end

@@ -21,12 +21,8 @@ classdef AuxiliaryParticleFilter < NonlinearParticleFilter
     properties
         % APF-specific parameters
         apfNonlinearityThreshold (1,1) double = 0.5  % Threshold for nonlinearity detection
-        apfSmoothingAlpha        (1,1) double = 1.0  % α ∈ [1, ∞), 1 = no smoothing
+        apfSmoothingAlpha        (1,1) double = 1.1  % α ∈ [1, ∞), 1 = no smoothing
         apfEnableLookAhead       (1,1) logical = true % Enable/disable apf look-ahead
-
-        % State bounds
-        stateLowerBound (2,1) double = [0; 0]
-        stateUpperBound (2,1) double = [10; 10]
     end
 
     methods
@@ -42,24 +38,11 @@ classdef AuxiliaryParticleFilter < NonlinearParticleFilter
             if isfield(config, 'apfEnableLookAhead')
                 obj.apfEnableLookAhead = config.apfEnableLookAhead;
             end
-
-            anchorLb = min(obj.anchorPos, [], 1).';
-            anchorUb = max(obj.anchorPos, [], 1).';
-            obj.stateLowerBound = max(anchorLb, [0; 0]);
-            obj.stateUpperBound = anchorUb;
-
-            if isfield(config, 'stateLowerBound')
-                obj.stateLowerBound = reshape(config.stateLowerBound, [2, 1]);
-            end
-            if isfield(config, 'stateUpperBound')
-                obj.stateUpperBound = reshape(config.stateUpperBound, [2, 1]);
-            end
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             % Predict particles
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
-            particlesPred = obj.applyBoundaryClip(particlesPred);
 
             zNow = obj.z(:, pointIdx, iterIdx);
 
@@ -105,16 +88,14 @@ classdef AuxiliaryParticleFilter < NonlinearParticleFilter
                 return;
             end
 
-            % Strong nonlinearity: compute look-ahead weights
-            % μ_k,i as running mean across particles (simplification)
-            muPred = mean(particlesPred, 2);  % 2×1 mean state
+            % Strong nonlinearity: compute particle-wise look-ahead weights
+            % μ_k,i is approximated by each predicted particle state.
+            yPredMu = obj.H_nonlinear(particlesPred);
+            llhMu = obj.computeLogLikelihood(zNow, yPredMu);
+            llhMu = llhMu - max(llhMu);
 
-            % Predicted likelihood at mean state
-            yMean = obj.H_nonlinear(muPred);
-            llhMean = obj.computeLogLikelihood(zNow, yMean);
-
-            % Auxiliary weights q_i ∝ w_{k-1,i} * exp(llh_mean)
-            qAux = prevWeights(:)' .* exp(llhMean);
+            % Auxiliary weights q_i ∝ w_{k-1,i} * p(y_k | μ_k,i)
+            qAux = prevWeights(:)' .* exp(llhMu);
 
             % Optional: Apply probability smoothing
             if obj.apfSmoothingAlpha > 1.0
@@ -124,8 +105,14 @@ classdef AuxiliaryParticleFilter < NonlinearParticleFilter
             end
 
             % Normalize
+            qAux = max(qAux, 0);
             qAux = qAux + 1e-300;
-            qAux = (qAux / sum(qAux)).';
+            qSum = sum(qAux);
+            if ~isfinite(qSum) || qSum <= 0
+                qAux = prevWeights(:);
+            else
+                qAux = (qAux / qSum).';
+            end
         end
 
         function llh = computeLogLikelihood(obj, zNow, yPred)
@@ -135,12 +122,6 @@ classdef AuxiliaryParticleFilter < NonlinearParticleFilter
             errors = zNow - yPred;
             distances = sum((Rinv * errors) .* errors, 1);
             llh = -0.5 * distances;
-        end
-
-        function particlesOut = applyBoundaryClip(obj, particlesIn)
-            % Enforce state bounds
-            particlesOut = max(particlesIn, obj.stateLowerBound);
-            particlesOut = min(particlesOut, obj.stateUpperBound);
         end
     end
 end

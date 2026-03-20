@@ -9,8 +9,6 @@ classdef RegularizedParticleFilter < NonlinearParticleFilter
 
     properties
         bandwidthFloor (1,1) double = 1e-3
-        stateLowerBound (2,1) double = [0; 0]
-        stateUpperBound (2,1) double = [10; 10]
     end
 
     methods
@@ -20,23 +18,10 @@ classdef RegularizedParticleFilter < NonlinearParticleFilter
             if isfield(config, 'rpfBandwidthFloor')
                 obj.bandwidthFloor = max(config.rpfBandwidthFloor, 0);
             end
-
-            anchorLb = min(obj.anchorPos, [], 1).';
-            anchorUb = max(obj.anchorPos, [], 1).';
-            obj.stateLowerBound = max(anchorLb, [0; 0]);
-            obj.stateUpperBound = anchorUb;
-
-            if isfield(config, 'stateLowerBound')
-                obj.stateLowerBound = reshape(config.stateLowerBound, [2, 1]);
-            end
-            if isfield(config, 'stateUpperBound')
-                obj.stateUpperBound = reshape(config.stateUpperBound, [2, 1]);
-            end
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
-            particlesPred = obj.applyBoundaryClip(particlesPred);
 
             zNow = obj.z(:, pointIdx, iterIdx);
             weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
@@ -65,7 +50,6 @@ classdef RegularizedParticleFilter < NonlinearParticleFilter
             kernelNoise = obj.sampleEpanechnikovNoise(size(baseParticles, 1), obj.numParticles);
 
             particlesOut = baseParticles + h * (A * kernelNoise);
-            particlesOut = obj.applyBoundaryClip(particlesOut);
             weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
         end
 
@@ -159,9 +143,5 @@ classdef RegularizedParticleFilter < NonlinearParticleFilter
             end
         end
 
-        function particlesOut = applyBoundaryClip(obj, particlesIn)
-            particlesOut = max(particlesIn, obj.stateLowerBound);
-            particlesOut = min(particlesOut, obj.stateUpperBound);
-        end
     end
 end

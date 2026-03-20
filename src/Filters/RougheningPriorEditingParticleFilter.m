@@ -9,9 +9,6 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
         rougheningK      (1,1) double = 0.2
         priorSigmaGate   (1,1) double = 6.0
         priorMaxRetry    (1,1) double = 30
-
-        stateLowerBound  (2,1) double = [0; 0]
-        stateUpperBound  (2,1) double = [10; 10]
     end
 
     methods
@@ -27,23 +24,10 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
             if isfield(config, 'priorMaxRetry')
                 obj.priorMaxRetry = max(1, round(config.priorMaxRetry));
             end
-
-            anchorLb = min(obj.anchorPos, [], 1).';
-            anchorUb = max(obj.anchorPos, [], 1).';
-            obj.stateLowerBound = max(anchorLb, [0; 0]);
-            obj.stateUpperBound = anchorUb;
-
-            if isfield(config, 'stateLowerBound')
-                obj.stateLowerBound = reshape(config.stateLowerBound, [2, 1]);
-            end
-            if isfield(config, 'stateUpperBound')
-                obj.stateUpperBound = reshape(config.stateUpperBound, [2, 1]);
-            end
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
-            particlesPred = obj.applyBoundaryClip(particlesPred);
 
             zNow = obj.z(:, pointIdx, iterIdx);
             particlesPred = obj.applyPriorEditing(particlesPred, state.velPrev, zNow);
@@ -53,7 +37,6 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
 
             [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
             particlesRes = obj.applyRoughening(particlesRes);
-            particlesRes = obj.applyBoundaryClip(particlesRes);
 
             state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
             state.particlesPrev = particlesRes;
@@ -91,7 +74,6 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
                     % First roughen rejected prior particle, then propagate.
                     candidate = candidate + sigmaRough .* randn(2, 1);
                     candidate = candidate + velOne + obj.processBias + obj.sampleProcessSingle();
-                    candidate = obj.applyBoundaryClip(candidate);
 
                     score = obj.particleResidualScore(candidate, zNow);
                     if score < bestScore
@@ -144,11 +126,6 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
             yPred = obj.H_nonlinear(particles);
             residual = zNow - yPred;
             tf = all(abs(residual) <= gate, 1);
-        end
-
-        function particlesOut = applyBoundaryClip(obj, particlesIn)
-            particlesOut = max(particlesIn, obj.stateLowerBound);
-            particlesOut = min(particlesOut, obj.stateUpperBound);
         end
     end
 end

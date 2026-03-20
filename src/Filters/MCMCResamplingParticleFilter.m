@@ -25,10 +25,6 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
 
         % Proposal noise scale (relative to process noise)
         proposalScale (1,1) double = 1.0
-
-        % State boundary constraints
-        stateLowerBound (2,1) double = [0; 0]
-        stateUpperBound (2,1) double = [10; 10]
     end
 
     methods
@@ -44,24 +40,11 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
             if isfield(config, 'proposalScale')
                 obj.proposalScale = max(config.proposalScale, 0.1);
             end
-
-            anchorLb = min(obj.anchorPos, [], 1).';
-            anchorUb = max(obj.anchorPos, [], 1).';
-            obj.stateLowerBound = max(anchorLb, [0; 0]);
-            obj.stateUpperBound = anchorUb;
-
-            if isfield(config, 'stateLowerBound')
-                obj.stateLowerBound = reshape(config.stateLowerBound, [2, 1]);
-            end
-            if isfield(config, 'stateUpperBound')
-                obj.stateUpperBound = reshape(config.stateUpperBound, [2, 1]);
-            end
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             % Predict particles
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
-            particlesPred = obj.applyBoundaryClip(particlesPred);
 
             % Measure and update weights
             zNow = obj.z(:, pointIdx, iterIdx);
@@ -104,7 +87,6 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
                         % Proposal: random walk with scaled Gaussian noise
                         proposalNoise = obj.proposalScale * obj.noiseScale * randn(2, 1);
                         xProposal = particlesMH(:, i) + proposalNoise;
-                        xProposal = obj.applyBoundaryClip(xProposal);
 
                         % Compute likelihoods for current and proposed states
                         yPredCurrent = obj.H_nonlinear(particlesMH(:, i));
@@ -161,10 +143,5 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
             end
         end
 
-        function particlesOut = applyBoundaryClip(obj, particlesIn)
-            % Enforce state bounds
-            particlesOut = max(particlesIn, obj.stateLowerBound);
-            particlesOut = min(particlesOut, obj.stateUpperBound);
-        end
     end
 end
