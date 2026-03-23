@@ -88,7 +88,7 @@ classdef IAEMapAdaptiveParticleFilter < NonlinearParticleFilter
                 obj.mapFeedbackGain * feedbackTarget + ...
                 obj.parameterJitterStd * randn(2, obj.numParticles);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            state.velPrev = particlesRes - state.particlesPrev(:, resampleIdx);
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
@@ -153,7 +153,7 @@ classdef IAEMapAdaptiveParticleFilter < NonlinearParticleFilter
             innovationDriven = Czk - Rk;
             innovationDriven = 0.5 * (innovationDriven + innovationDriven');
 
-            % Pseudo-inverse(SVD 기반)로 특이 Jacobian 상황 안정화.
+            % Pseudo-inverse(SVD 기반)�??�이 Jacobian ?�황 ?�정??
             Hplus = pinv(Hk, obj.regLambda);
             Qk = Hplus * innovationDriven * Hplus';
             Qk = 0.5 * (Qk + Qk');

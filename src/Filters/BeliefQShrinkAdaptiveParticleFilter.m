@@ -1,6 +1,6 @@
 classdef BeliefQShrinkAdaptiveParticleFilter < AdaptiveParticleFilter
     % BeliefQShrinkAdaptiveParticleFilter
-    % s_k 기반으로 R inflation을 유지하면서 예측 노이즈(Q)를 축소한다.
+    % s_k 기반?�로 R inflation???��??�면???�측 ?�이�?Q)�?축소?�다.
 
     properties
         qShrinkGain      (1,1) double = 0.3
@@ -44,9 +44,13 @@ classdef BeliefQShrinkAdaptiveParticleFilter < AdaptiveParticleFilter
             weightsUpd = obj.updateWeightsWithR(particlesPred, state.weights, zNow, diag(state.diagR));
 
             est = particlesPred * weightsUpd;
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;

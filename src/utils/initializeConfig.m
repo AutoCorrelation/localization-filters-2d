@@ -5,7 +5,7 @@ function config = initializeConfig(numParticle)
     config.pathData = '../data/';
     config.pathResult = '../result/';
     config.numSamples = 1e5;
-    config.iterations = 1e3;
+    config.iterations = 5e2;
     config.noiseVariance = [1e-2, 1e-1, 1, 1e1, 1e2];
     config.numPoints = 10;
     config.Anchor = [0 10; 0 0; 10 0; 10 10]';
@@ -25,11 +25,6 @@ function config = initializeConfig(numParticle)
     end
     config.resampleThresholdRatio = 0.5;
     config.decayGamma = [0.4 0.5 0.5 0.3 0.5];
-
-    % APF defaults
-    config.apfNonlinearityThreshold = 0.5;
-    config.apfSmoothingAlpha = 1.1;
-    config.apfEnableLookAhead = true;
 
     % IAE + MAP adaptive PF defaults
     config.iaeWindowLength = 20;
@@ -55,6 +50,7 @@ function config = initializeConfig(numParticle)
     % R-diag prior-edit adaptive PF defaults
     config.rdiagPriorSigmaGate = 6.0;
     config.rdiagPriorMaxRetry = 20;
+    config.rdiagRougheningK = 0.2;
 
     % Belief-roughening adaptive PF defaults
     config.beliefRougheningKBase = 0.2;
@@ -65,4 +61,10 @@ function config = initializeConfig(numParticle)
     config.rougheningK = 0.2;
     config.priorSigmaGate = 6.0;
     config.priorMaxRetry = 30;
+
+    % EKF-proposal PF defaults
+    config.ekfEnabled = true;
+    config.ekfQScale = 1.0;
+    config.ekfUseDataQ = true;
+    config.ekfUseDataP0 = true;
 end

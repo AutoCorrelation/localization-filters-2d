@@ -30,21 +30,25 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
             zNow = obj.z(:, pointIdx, iterIdx);
-            particlesPred = obj.applyPriorEditing(particlesPred, state.velPrev, zNow);
+            particlesPred = obj.applyPriorEditing(particlesPred, state.particlesPrev, state.velPrev, zNow);
 
             weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
             est = particlesPred * weightsUpd;
 
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
             particlesRes = obj.applyRoughening(particlesRes);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
         end
 
-        function particlesOut = applyPriorEditing(obj, particlesIn, velPrev, zNow)
+        function particlesOut = applyPriorEditing(obj, particlesIn, prevParticles, velPrev, zNow)
             particlesOut = particlesIn;
             gate = obj.priorSigmaGate * obj.noiseScale;
 
@@ -60,6 +64,7 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
             for ii = 1:numel(rejectIdx)
                 idx = rejectIdx(ii);
                 velOne = velPrev(:, idx);
+                prevOne = prevParticles(:, idx);
 
                 bestParticle = particlesOut(:, idx);
                 bestScore = obj.particleResidualScore(bestParticle, zNow);
@@ -69,11 +74,9 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
                 while (~accepted) && (attempt < obj.priorMaxRetry)
                     attempt = attempt + 1;
 
-                    candidate = particlesOut(:, idx);
-
-                    % First roughen rejected prior particle, then propagate.
-                    candidate = candidate + sigmaRough .* randn(2, 1);
-                    candidate = candidate + velOne + obj.processBias + obj.sampleProcessSingle();
+                    % Repropagate from previous state particle with roughening.
+                    base = prevOne + sigmaRough .* randn(2, 1);
+                    candidate = base + velOne + obj.processBias + obj.sampleProcessSingle();
 
                     score = obj.particleResidualScore(candidate, zNow);
                     if score < bestScore

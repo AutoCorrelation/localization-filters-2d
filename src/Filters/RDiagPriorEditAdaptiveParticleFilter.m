@@ -1,10 +1,11 @@
 classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
     % RDiagPriorEditAdaptiveParticleFilter
-    % R inflation으로 얻은 diag(R_k)를 prior editing gate에 사용한다.
+    % R inflation?�로 ?��? diag(R_k)�?prior editing gate???�용?�다.
 
     properties
         priorSigmaGate  (1,1) double = 6.0
         priorMaxRetry   (1,1) double = 20
+        rougheningK     (1,1) double = 0.2
     end
 
     methods
@@ -16,6 +17,9 @@ classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
             end
             if isfield(config, 'rdiagPriorMaxRetry')
                 obj.priorMaxRetry = max(1, round(config.rdiagPriorMaxRetry));
+            end
+            if isfield(config, 'rdiagRougheningK')
+                obj.rougheningK = max(config.rdiagRougheningK, 0);
             end
         end
 
@@ -31,25 +35,31 @@ classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
             state.diagR = state.nominalDiagR + obj.lambdaR * state.sMoment;
             state.diagR = min(max(state.diagR, obj.rFloor), obj.rCeil);
 
-            particlesEdited = obj.applyPriorEditingWithAdaptiveR(particlesPred, state.velPrev, zNow, state.diagR);
+            particlesEdited = obj.applyPriorEditingWithAdaptiveR( ...
+                particlesPred, state.particlesPrev, state.velPrev, zNow, state.diagR);
 
             weightsUpd = obj.updateWeightsWithR(particlesEdited, state.weights, zNow, diag(state.diagR));
 
             est = particlesEdited * weightsUpd;
-            [particlesRes, weightsRes] = obj.resampleEss(particlesEdited, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesEdited, weightsUpd);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
         end
 
-        function particlesOut = applyPriorEditingWithAdaptiveR(obj, particlesIn, velPrev, zNow, diagR)
+        function particlesOut = applyPriorEditingWithAdaptiveR(obj, particlesIn, prevParticles, velPrev, zNow, diagR)
             particlesOut = particlesIn;
 
             sigmaGate = obj.priorSigmaGate * sqrt(max(diagR(:), obj.rFloor));
             validMask = obj.isWithinAdaptiveGate(particlesOut, zNow, sigmaGate);
             rejectIdx = find(~validMask);
+            sigmaRough = obj.computeRougheningSigma(particlesIn);
 
             for ii = 1:numel(rejectIdx)
                 idx = rejectIdx(ii);
@@ -58,7 +68,8 @@ classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
 
                 accepted = false;
                 for attempt = 1:obj.priorMaxRetry
-                    candidate = particlesOut(:, idx) + velPrev(:, idx) + obj.processBias + obj.sampleProcessSingle();
+                    base = prevParticles(:, idx) + sigmaRough .* randn(2, 1);
+                    candidate = base + velPrev(:, idx) + obj.processBias + obj.sampleProcessSingle();
                     score = obj.normalizedResidualScore(candidate, zNow, sigmaGate);
 
                     if score < bestScore
@@ -77,6 +88,13 @@ classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
                     particlesOut(:, idx) = bestParticle;
                 end
             end
+        end
+
+        function sigma = computeRougheningSigma(obj, particles)
+            n = size(particles, 1);
+            N = size(particles, 2);
+            span = max(particles, [], 2) - min(particles, [], 2);
+            sigma = obj.rougheningK * span * (N ^ (-1 / n));
         end
 
         function tf = isWithinAdaptiveGate(obj, particles, zNow, sigmaGate)

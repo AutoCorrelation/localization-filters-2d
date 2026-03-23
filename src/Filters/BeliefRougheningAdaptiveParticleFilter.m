@@ -1,6 +1,6 @@
 classdef BeliefRougheningAdaptiveParticleFilter < AdaptiveParticleFilter
     % BeliefRougheningAdaptiveParticleFilter
-    % s_k에 따라 roughening 강도를 동적으로 조절한다.
+    % s_k???�라 roughening 강도�??�적?�로 조절?�다.
 
     properties
         rougheningKBase  (1,1) double = 0.2
@@ -43,9 +43,7 @@ classdef BeliefRougheningAdaptiveParticleFilter < AdaptiveParticleFilter
             weightsUpd = obj.updateWeightsWithR(particlesPred, state.weights, zNow, diag(state.diagR));
             est = particlesPred * weightsUpd;
 
-            ess = 1 / sum(weightsUpd .^ 2);
-            didResample = ess < obj.numParticles * obj.resampleThresholdRatio;
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
 
             beliefRatio = mean(state.sMoment ./ max(state.nominalDiagR, obj.rFloor));
             rougheningKNow = obj.rougheningKBase * (1 + obj.rougheningGain * beliefRatio);
@@ -55,7 +53,11 @@ classdef BeliefRougheningAdaptiveParticleFilter < AdaptiveParticleFilter
                 particlesRes = obj.applyBeliefRoughening(particlesRes, rougheningKNow);
             end
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;

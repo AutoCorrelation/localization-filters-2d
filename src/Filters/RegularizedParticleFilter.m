@@ -27,19 +27,25 @@ classdef RegularizedParticleFilter < NonlinearParticleFilter
             weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
 
             est = particlesPred * weightsUpd;
-            [particlesRes, weightsRes] = obj.regularizedResampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.regularizedResampleEss(particlesPred, weightsUpd);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
         end
 
-        function [particlesOut, weightsOut] = regularizedResampleEss(obj, particles, weights)
+        function [particlesOut, weightsOut, idx, didResample] = regularizedResampleEss(obj, particles, weights)
             ess = 1 / sum(weights .^ 2);
             if ess >= obj.numParticles * obj.resampleThresholdRatio
                 particlesOut = particles;
                 weightsOut = weights;
+                idx = (1:obj.numParticles)';
+                didResample = false;
                 return;
             end
 
@@ -51,6 +57,7 @@ classdef RegularizedParticleFilter < NonlinearParticleFilter
 
             particlesOut = baseParticles + h * (A * kernelNoise);
             weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
+            didResample = true;
         end
 
         function [A, h] = computeCovarianceRootAndBandwidth(obj, particles)

@@ -63,8 +63,6 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
             filterObj = RegularizedParticleFilter(data, config, noiseIdx);
         case {'mcmcresamplingparticlefilter', 'mcmcpf'}
             filterObj = MCMCResamplingParticleFilter(data, config, noiseIdx);
-        case {'auxiliaryparticlefilter', 'apf'}
-            filterObj = AuxiliaryParticleFilter(data, config, noiseIdx);
         case {'rougheningprioreditingparticlefilter', 'rpeparticlefilter'}
             filterObj = RougheningPriorEditingParticleFilter(data, config, noiseIdx);
         case {'ekfparticlefilter', 'ekfpf'}
@@ -72,6 +70,9 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
         case 'adaptiveparticlefilter'
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = AdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'residualsquaredadaptiveparticlefilter', 'rsapf'}
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = ResidualSquaredAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
         case {'beliefqshrinkadaptiveparticlefilter', 'bqspf'}
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = BeliefQShrinkAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);

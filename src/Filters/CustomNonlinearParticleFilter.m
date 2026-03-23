@@ -6,14 +6,14 @@ classdef CustomNonlinearParticleFilter < NonlinearParticleFilter
     methods
         function obj = CustomNonlinearParticleFilter(data, config, noiseIdx)
             obj@NonlinearParticleFilter(data, config, noiseIdx);
-            % 추가 커스텀 파라미터/로직은 여기서 구현
+            % 추�? 커스?� ?�라미터/로직?� ?�기??구현
         end
 
         function state = initializeState(obj, numPoints)
             state = initializeState@NonlinearParticleFilter(obj, numPoints);
             state.M = zeros(4, obj.numParticles); % AdaBelief 1st moment
             state.S = zeros(4, obj.numParticles); % AdaBelief 2nd
-            % 커스텀 초기화 로직이 필요한 경우 여기에 추가
+            % 커스?� 초기??로직???�요??경우 ?�기??추�?
         end
 
         function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow)
@@ -37,7 +37,7 @@ classdef CustomNonlinearParticleFilter < NonlinearParticleFilter
         %     est = particlesPred * weightsUpd;
         %     [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
 
-        %     state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+        %     state.velPrev = particlesRes - state.particlesPrev;
         %     state.particlesPrev = particlesRes;
         %     state.weights = weightsRes;
         %     state.estimatedPos(:, pointIdx) = est;

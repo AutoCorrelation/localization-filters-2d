@@ -26,6 +26,11 @@ if ~isfile(h5File)
     dataGenerate(config);
 end
 
+
+targetFilters = {
+    struct('name', 'AdaptiveParticleFilter', 'factory', @(d, c, n, b, l) AdaptiveParticleFilter(d, c, n, b, l), 'resultPrefix', 'adaptive'), ...
+    struct('name', 'ResidualSquaredAdaptiveParticleFilter', 'factory', @(d, c, n, b, l) ResidualSquaredAdaptiveParticleFilter(d, c, n, b, l), 'resultPrefix', 'residualSq') ...
+};
 dataAll = loadSimulationData(h5File);
 trainData = splitDataBySample(dataAll, 'train', opt.splitRatios, opt.splitSeed);
 valData = splitDataBySample(dataAll, 'val', opt.splitRatios, opt.splitSeed);
@@ -33,72 +38,75 @@ testData = splitDataBySample(dataAll, 'test', opt.splitRatios, opt.splitSeed);
 
 numNoise = numel(config.noiseVariance);
 
-bestBeta = nan(numNoise, 1);
-bestLambdaR = nan(numNoise, 1);
-bestAdaptiveValRMSE = inf(numNoise, 1);
-bestAdaptiveTrainRMSE = inf(numNoise, 1);
+results = struct();
+for filterIdx = 1:numel(targetFilters)
+    filterSpec = targetFilters{filterIdx};
 
-fprintf('\n=== Per-noise Grid Search: AdaptiveParticleFilter ===\n');
-for noiseIdx = 1:numNoise
-    fprintf('\n[Noise %.0e] beta-lambdaR search\n', config.noiseVariance(noiseIdx));
+    bestBeta = nan(numNoise, 1);
+    bestLambdaR = nan(numNoise, 1);
+    bestValRMSE = inf(numNoise, 1);
+    bestTrainRMSE = inf(numNoise, 1);
 
-    for b = 1:numel(opt.betaGrid)
-        for l = 1:numel(opt.lambdaRGrid)
-            beta = opt.betaGrid(b);
-            lambdaR = opt.lambdaRGrid(l);
+    fprintf('\n=== Per-noise Grid Search: %s ===\n', filterSpec.name);
+    for noiseIdx = 1:numNoise
+        fprintf('\n[Noise %.0e] %s beta-lambdaR search\n', config.noiseVariance(noiseIdx), filterSpec.name);
 
-            trainSeed = baseSeed + 3000 * noiseIdx + 100 * b + l;
-            valSeed = baseSeed + 4000 * noiseIdx + 100 * b + l;
+        for b = 1:numel(opt.betaGrid)
+            for l = 1:numel(opt.lambdaRGrid)
+                beta = opt.betaGrid(b);
+                lambdaR = opt.lambdaRGrid(l);
 
-            factory = @(d, c, n) AdaptiveParticleFilter(d, c, n, beta, lambdaR);
-            trainRMSE = evalSingleNoiseFilter(factory, trainData, config, noiseIdx, opt.tuneIterations, trainSeed);
-            valRMSE = evalSingleNoiseFilter(factory, valData, config, noiseIdx, opt.tuneIterations, valSeed);
+                trainSeed = baseSeed + 3000 * noiseIdx + 100 * b + l;
+                valSeed = baseSeed + 4000 * noiseIdx + 100 * b + l;
 
-            fprintf('  beta=%.3f, lambdaR=%.3f -> train RMSE=%.6f, val RMSE=%.6f\n', ...
-                beta, lambdaR, trainRMSE, valRMSE);
+                factory = @(d, c, n) filterSpec.factory(d, c, n, beta, lambdaR);
+                trainRMSE = evalSingleNoiseFilter(factory, trainData, config, noiseIdx, opt.tuneIterations, trainSeed);
+                valRMSE = evalSingleNoiseFilter(factory, valData, config, noiseIdx, opt.tuneIterations, valSeed);
 
-            if valRMSE < bestAdaptiveValRMSE(noiseIdx)
-                bestAdaptiveValRMSE(noiseIdx) = valRMSE;
-                bestAdaptiveTrainRMSE(noiseIdx) = trainRMSE;
-                bestBeta(noiseIdx) = beta;
-                bestLambdaR(noiseIdx) = lambdaR;
+                fprintf('  beta=%.3f, lambdaR=%.3f -> train RMSE=%.6f, val RMSE=%.6f\n', ...
+                    beta, lambdaR, trainRMSE, valRMSE);
+
+                if valRMSE < bestValRMSE(noiseIdx)
+                    bestValRMSE(noiseIdx) = valRMSE;
+                    bestTrainRMSE(noiseIdx) = trainRMSE;
+                    bestBeta(noiseIdx) = beta;
+                    bestLambdaR(noiseIdx) = lambdaR;
+                end
             end
         end
     end
+
+    fprintf('\n=== Final Test Evaluation with Per-noise Best Params: %s ===\n', filterSpec.name);
+    testRMSE = nan(numNoise, 1);
+    testMAE = nan(numNoise, 1);
+
+    for noiseIdx = 1:numNoise
+        testFactory = @(d, c, n) filterSpec.factory(d, c, n, bestBeta(noiseIdx), bestLambdaR(noiseIdx));
+        [testRMSE(noiseIdx), testMAE(noiseIdx)] = evalSingleNoiseFilterWithMAE( ...
+            testFactory, testData, config, noiseIdx, opt.finalIterations, baseSeed + 5000 + noiseIdx);
+    end
+
+    fprintf('\n[Best Params] %s\n', filterSpec.name);
+    fprintf('Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testMAE\n');
+    fprintf('--------------------------------------------------------------------------\n');
+    for i = 1:numNoise
+        fprintf('%.0e | %.4f | %.4f | %.6f | %.6f | %.6f | %.6f\n', ...
+            config.noiseVariance(i), bestBeta(i), bestLambdaR(i), ...
+            bestTrainRMSE(i), bestValRMSE(i), testRMSE(i), testMAE(i));
+    end
+
+    results.(filterSpec.resultPrefix).bestBeta = bestBeta;
+    results.(filterSpec.resultPrefix).bestLambdaR = bestLambdaR;
+    results.(filterSpec.resultPrefix).bestTrainRMSE = bestTrainRMSE;
+    results.(filterSpec.resultPrefix).bestValRMSE = bestValRMSE;
+    results.(filterSpec.resultPrefix).testRMSE = testRMSE;
+    results.(filterSpec.resultPrefix).testMAE = testMAE;
 end
 
-% Final test evaluation with selected per-noise parameters
-fprintf('\n=== Final Test Evaluation with Per-noise Best Params ===\n');
-
-adaptiveTestRMSE = nan(numNoise, 1);
-adaptiveTestMAE = nan(numNoise, 1);
-
-for noiseIdx = 1:numNoise
-    adaptiveFactory = @(d, c, n) AdaptiveParticleFilter(d, c, n, bestBeta(noiseIdx), bestLambdaR(noiseIdx));
-    [adaptiveTestRMSE(noiseIdx), adaptiveTestMAE(noiseIdx)] = evalSingleNoiseFilterWithMAE( ...
-        adaptiveFactory, testData, config, noiseIdx, opt.finalIterations, baseSeed + 5000 + noiseIdx);
-end
-
-fprintf('\n[Best Params] AdaptiveParticleFilter\n');
-fprintf('Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testMAE\n');
-fprintf('--------------------------------------------------------------------------\n');
-for i = 1:numNoise
-    fprintf('%.0e | %.4f | %.4f | %.6f | %.6f | %.6f | %.6f\n', ...
-        config.noiseVariance(i), bestBeta(i), bestLambdaR(i), ...
-        bestAdaptiveTrainRMSE(i), bestAdaptiveValRMSE(i), adaptiveTestRMSE(i), adaptiveTestMAE(i));
-end
-
-resultFile = fullfile(config.pathResult, 'per_noise_gridsearch_results.mat');
+resultFile = fullfile(config.pathResult, 'per_noise_gridsearch_AdaptiveParticleFilter_and_ResidualSquaredAdaptiveParticleFilter.mat');
 if ~exist(config.pathResult, 'dir')
     mkdir(config.pathResult);
 end
-results = struct();
-results.bestBeta = bestBeta;
-results.bestLambdaR = bestLambdaR;
-results.bestAdaptiveTrainRMSE = bestAdaptiveTrainRMSE;
-results.bestAdaptiveValRMSE = bestAdaptiveValRMSE;
-results.adaptiveTestRMSE = adaptiveTestRMSE;
-results.adaptiveTestMAE = adaptiveTestMAE;
 results.noiseVariance = config.noiseVariance;
 results.options = opt;
 save(resultFile, 'results');

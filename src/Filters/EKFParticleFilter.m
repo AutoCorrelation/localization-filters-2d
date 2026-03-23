@@ -1,248 +1,212 @@
 classdef EKFParticleFilter < NonlinearParticleFilter
-    % EKFParticleFilter (Extended Kalman Filter - Particle Filter)
+    % EKFParticleFilter
     %
-    % Hybrid filter combining EKF proposal with particle filter structure:
-    %   1) Each particle is processed as independent EKF in predict step
-    %   2) Jacobian F (state transition) and H (observation) computed per particle
-    %   3) Kalman gain computed per particle to form optimal proposal
-    %   4) Final weighted update using observation likelihood
-    %
-    % [Vectorized Implementation - NO sequential loops]
-    %   - Covariance matrices: P stored as (2, 2, N) tensor
-    %   - Jacobians F, H computed in batched form
-    %   - Kalman updates via batched matrix operations (pagemtimes, linsolve)
-    %
-    % [Key Jacobians for 2D localization]
-    %   F_k = ∂f/∂x |_{x_{k-1}^+}     [state transition: typically identity + dt*I]
-    %   H_k,i = ∂h/∂x |_{x_k,i^-}     [observation: ∂(√(x-anchorᵢ)²)/∂x]
+    % Fully corrected EKF-proposal particle filter:
+    %   q(x_k|x_{k-1}, z_k) = N(mu_q, P_q) from per-particle EKF update
+    %   w_k^i proportional to w_{k-1}^i * p(z_k|x_k^i) * p(x_k^i|x_{k-1}^i) / q(x_k^i|x_{k-1}^i, z_k)
 
     properties
-        % EKF state covariance for each particle (2 x 2 x numParticles)
-        particleCovariances     % Shape: (2, 2, numParticles)
-        initCovariance   (2,2) double = 0.1 * eye(2)
+        particleCovariances
+        initCovariance (2,2) double = 0.1 * eye(2)
 
-        % Process and observation noise covariances
-        Q                      (2,2) double   % Process noise covariance
-        observationNoiseVar    (1,1) double   % Observation noise variance
+        Q (2,2) double
+        regJitter (1,1) double = 1e-9
 
-        % EKF-specific parameters
-        ekfEnabled      (1,1) logical = true
-        ekfDownweight   (1,1) double  = 0.0  % Regularization: blend toward uniform
+        ekfEnabled (1,1) logical = true
     end
 
     methods
         function obj = EKFParticleFilter(data, config, noiseIdx)
             obj@NonlinearParticleFilter(data, config, noiseIdx);
 
-            % Initialize process noise covariance
-            % Assuming constant velocity model with small process noise
-            dtNominal = 1.0;
-            obj.Q = (obj.noiseScale^2) * eye(2) * (dtNominal^2);
-            obj.observationNoiseVar = obj.noiseScale^2;
+            qScale = 1.0;
+            if isfield(config, 'ekfQScale')
+                qScale = max(config.ekfQScale, 1e-6);
+            end
+            obj.Q = (obj.noiseScale ^ 2) * qScale * eye(2);
 
-            % Initialize covariance for each particle (2 x 2 x N)
-            % Start with isotropic covariance
-            obj.particleCovariances = repmat(obj.initCovariance, [1, 1, obj.numParticles]);
+            if isfield(config, 'ekfUseDataQ') && config.ekfUseDataQ
+                if isfield(data, 'Q')
+                    qMat = squeeze(data.Q(:, :, noiseIdx));
+                    if isequal(size(qMat), [2, 2])
+                        qMat = 0.5 * (qMat + qMat');
+                        obj.Q = qScale * qMat;
+                    end
+                end
+            end
+
+            if isfield(config, 'ekfUseDataP0') && config.ekfUseDataP0
+                if isfield(data, 'P0')
+                    p0 = squeeze(data.P0(:, :, noiseIdx));
+                    if isequal(size(p0), [2, 2])
+                        p0 = 0.5 * (p0 + p0');
+                        obj.initCovariance = p0;
+                    end
+                end
+            end
+
+            if isfield(config, 'ekfInitCovariance')
+                if isequal(size(config.ekfInitCovariance), [2, 2])
+                    obj.initCovariance = config.ekfInitCovariance;
+                end
+            end
 
             if isfield(config, 'ekfEnabled')
                 obj.ekfEnabled = config.ekfEnabled;
             end
-            if isfield(config, 'ekfDownweight')
-                obj.ekfDownweight = max(config.ekfDownweight, 0);
-            end
+
+            obj.particleCovariances = repmat(obj.initCovariance, [1, 1, obj.numParticles]);
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             if pointIdx == 3
-                % Reset once per trajectory/iteration before first recursive update.
                 obj.particleCovariances = repmat(obj.initCovariance, [1, 1, obj.numParticles]);
             end
 
-            % Predict particles (standard PF)
-            particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
-
+            xPrev = state.particlesPrev;
+            vPrev = state.velPrev;
+            muTrans = xPrev + vPrev + obj.processBias;
             zNow = obj.z(:, pointIdx, iterIdx);
 
-            % EKF predict step for each particle (vectorized)
             if obj.ekfEnabled
-                obj.particleCovariances = obj.ekfPredictBatched(particlesPred, obj.particleCovariances);
-                % EKF update step (forms proposal with improved Jacobian)
-                [particleUpd, covUpd] = obj.ekfUpdateBatched(particlesPred, obj.particleCovariances, zNow);
-                obj.particleCovariances = covUpd;
-                weightsUpd = obj.updateWeightsNonlinear(particleUpd, state.weights, zNow);
-                particlesPred = particleUpd;
+                [particlesProp, proposalCov, logProposal] = obj.sampleEkfProposal(muTrans, obj.particleCovariances, zNow);
+                logLike = obj.computeLogLikelihood(zNow, obj.H_nonlinear(particlesProp));
+                logPrior = obj.computeLogTransitionPrior(particlesProp, muTrans);
+                logW = log(max(state.weights(:), 1e-300)) + logLike(:) + logPrior(:) - logProposal(:);
             else
-                weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
+                particlesProp = muTrans + obj.sampleProcess();
+                proposalCov = obj.particleCovariances;
+                logLike = obj.computeLogLikelihood(zNow, obj.H_nonlinear(particlesProp));
+                logW = log(max(state.weights(:), 1e-300)) + logLike(:);
             end
 
-            if obj.ekfDownweight > 0
-                wUniform = ones(obj.numParticles, 1) / obj.numParticles;
-                blend = min(obj.ekfDownweight, 1);
-                weightsUpd = (1 - blend) * weightsUpd + blend * wUniform;
-                weightsUpd = weightsUpd / sum(weightsUpd);
-            end
+            logW = logW - max(logW);
+            weightsUpd = exp(logW);
+            weightsUpd = weightsUpd + 1e-300;
+            weightsUpd = weightsUpd / sum(weightsUpd);
 
-            % Estimate position
-            est = particlesPred * weightsUpd;
+            est = particlesProp * weightsUpd;
 
-            % Standard PF resampling
-            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesProp, weightsUpd);
             if didResample
-                % Keep particle-state and EKF covariance ancestry aligned.
-                obj.particleCovariances = obj.particleCovariances(:, :, idxResampled);
+                obj.particleCovariances = proposalCov(:, :, idxResampled);
+            else
+                obj.particleCovariances = proposalCov;
             end
 
-            % Update state
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
         end
 
-        function P_pred = ekfPredictBatched(obj, particles, P_prev)
-            % Vectorized EKF predict step: P_k^- = F P_{k-1}^+ F^T + Q
-            %
-            % F is state transition Jacobian (here approximately identity)
-            % Particles shape: (2, N)
-            % P_prev shape: (2, 2, N)
-            % P_pred shape: (2, 2, N) [output]
-
-            N = size(particles, 2);
-
-            % For constant velocity model, F ≈ I (identity)
-            % Small process noise added via Q
-            F = eye(2);
-
-            % Batched computation: P_pred(:,:,i) = F @ P_prev(:,:,i) @ F' + Q
-            % Using permute and reshape for efficient batch multiply
-            P_pred = zeros(2, 2, N);
-            for i = 1:N
-                P_pred(:,:,i) = F * P_prev(:,:,i) * F' + obj.Q;
-            end
-        end
-
-        function [particles_upd, P_upd] = ekfUpdateBatched(obj, particles_pred, P_pred, zNow)
-            % Vectorized EKF update step per particle
-            % K = P H^T inv(H P H^T + R)
-            % x^+ = x^- + K(z - h(x^-))
-            % P^+ = (I - K H) P^-
-            %
-            % particles_pred: (2, N)
-            % P_pred: (2, 2, N)
-            % zNow: (numAnchors, 1)
-            % Output particles_upd: (2, N), P_upd: (2, 2, N)
-
-            N = size(particles_pred, 2);
+        function [samples, covOut, logQ] = sampleEkfProposal(obj, muTrans, covPrev, zNow)
+            N = size(muTrans, 2);
             numAnchors = size(zNow, 1);
+            Rk = (obj.noiseScale ^ 2) * eye(numAnchors);
 
-            % Compute observation predictions and Jacobians (vectorized)
-            yPred = obj.H_nonlinear(particles_pred);  % (numAnchors, N)
-            H_batch = obj.computeObservationJacobianBatched(particles_pred);  % (numAnchors, 2, N)
+            samples = zeros(2, N);
+            covOut = zeros(2, 2, N);
+            logQ = zeros(N, 1);
 
-            % Initialize output
-            particles_upd = particles_pred;
-            P_upd = P_pred;
-
-            % Batched Kalman update loop (vectorization within loop)
             for i = 1:N
-                H_i = H_batch(:, :, i);  % (numAnchors, 2)
-                P_i = P_pred(:, :, i);   % (2, 2)
-                y_i = yPred(:, i);       % (numAnchors, 1)
+                Ppred = covPrev(:, :, i) + obj.Q;
+                Ppred = 0.5 * (Ppred + Ppred');
 
-                % Innovation covariance: S = H P H^T + R
-                S_i = H_i * P_i * H_i' + obj.observationNoiseVar * eye(numAnchors);
+                xPred = muTrans(:, i);
+                yPred = obj.H_nonlinear(xPred);
+                Hk = obj.computeObservationJacobian(xPred);
 
-                % Kalman gain: K = P H^T S^{-1}
-                try
-                    K_i = P_i * H_i' / S_i;  % (2, numAnchors)
-                catch
-                    K_i = P_i * H_i' * pinv(S_i);
-                end
+                S = Hk * Ppred * Hk' + Rk;
+                S = 0.5 * (S + S') + obj.regJitter * eye(numAnchors);
 
-                % Innovation
-                innov_i = zNow - y_i;  % (numAnchors, 1)
+                K = (Ppred * Hk') / S;
 
-                % State update
-                particles_upd(:, i) = particles_pred(:, i) + K_i * innov_i;
+                muQ = xPred + K * (zNow - yPred);
 
-                % Covariance update: P^+ = (I - K H) P^-
-                P_upd(:, :, i) = (eye(2) - K_i * H_i) * P_i;
-                P_upd(:, :, i) = 0.5 * (P_upd(:, :, i) + P_upd(:, :, i)');  % Ensure symmetry
+                I2 = eye(2);
+                Pq = (I2 - K * Hk) * Ppred * (I2 - K * Hk)' + K * Rk * K';
+                Pq = 0.5 * (Pq + Pq') + obj.regJitter * eye(2);
+
+                xSample = obj.sampleGaussian(muQ, Pq);
+
+                samples(:, i) = xSample;
+                covOut(:, :, i) = Pq;
+                logQ(i) = obj.logGaussianPdf(xSample, muQ, Pq);
             end
         end
 
-        function H_batch = computeObservationJacobianBatched(obj, particles)
-            % Compute observation Jacobian for all particles at once
-            % h(x) = [||x - a_1||, ||x - a_2||, ..., ||x - a_m||]^T
-            % dh/dx_i = (x - a_i) / ||x - a_i||
-            %
-            % particles: (2, N)
-            % H_batch: (numAnchors, 2, N)
-
-            N = size(particles, 2);
+        function Hk = computeObservationJacobian(obj, x)
             numAnchors = size(obj.anchorPos, 1);
-            H_batch = zeros(numAnchors, 2, N);
+            Hk = zeros(numAnchors, 2);
 
-            for i = 1:numAnchors
-                anchPos = obj.anchorPos(i, :)';  % (2, 1)
-                % Vectorized difference: particles - anchorPos
-                % (2, N) - (2, 1) = (2, N)
-                diff = particles - anchPos;  % (2, N)
-                ranges = sqrt(sum(diff.^2, 1));  % (1, N)
-                ranges = max(ranges, 1e-6);  % Avoid division by zero
-
-                % Jacobian: dh_i/dx = diff / ||diff||
-                % Shape: (2, N)
-                jac = diff ./ ranges;  % (2, N)
-                H_batch(i, :, :) = permute(jac, [3, 1, 2]);  % (1, 2, N) -> reshape to (1, 2, N)
-            end
-        end
-
-        function [particlesOut, weightsOut, idx, didResample] = resampleEssWithIndices(obj, particles, weights)
-            % ESS-triggered resampling with explicit ancestry index output.
-            ess = 1 / sum(weights .^ 2);
-            if ess < obj.numParticles * obj.resampleThresholdRatio
-                wtc = cumsum(weights);
-                rpt = rand(obj.numParticles, 1);
-                [~, ind1] = sort([rpt; wtc]);
-                idx = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
-                particlesOut = particles(:, idx);
-                weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
-                didResample = true;
-            else
-                particlesOut = particles;
-                weightsOut = weights;
-                idx = [];
-                didResample = false;
-            end
-        end
-
-        function P_resampled = resampleCovariancesBatched(obj, P, weightsOld, ~)
-            % Resample covariances along with particles
-            % Find resampling indices from systematic resampling
-            N = obj.numParticles;
-            idx = obj.systematicResampleIndices(weightsOld, N);
-
-            % Permute covariances along third dimension
-            P_resampled = P(:, :, idx);
-        end
-
-        function idx = systematicResampleIndices(~, weights, N)
-            % Systematic resampling
-            cdf = cumsum(weights(:));
-            cdf(end) = 1.0;
-
-            u0 = rand / N;
-            u = u0 + (0:N-1)' / N;
-
-            idx = zeros(N, 1);
-            j = 1;
-            for i = 1:N
-                while u(i) > cdf(j)
-                    j = j + 1;
+            for a = 1:numAnchors
+                d = x - obj.anchorPos(a, :)';
+                r = norm(d);
+                if r < 1e-10
+                    r = 1e-10;
                 end
-                idx(i) = j;
+                Hk(a, :) = (d / r)';
             end
+        end
+
+        function logLike = computeLogLikelihood(obj, zNow, yPred)
+            numAnchors = size(yPred, 1);
+            invVar = 1 / (obj.noiseScale ^ 2);
+            err = zNow - yPred;
+            maha = sum((err .^ 2), 1) * invVar;
+            const = numAnchors * log(2 * pi * (obj.noiseScale ^ 2));
+            logLike = -0.5 * (maha + const);
+        end
+
+        function logPrior = computeLogTransitionPrior(obj, particles, muTrans)
+            N = size(particles, 2);
+            logPrior = zeros(N, 1);
+            for i = 1:N
+                logPrior(i) = obj.logGaussianPdf(particles(:, i), muTrans(:, i), obj.Q);
+            end
+        end
+
+        function x = sampleGaussian(obj, mu, Sigma)
+            L = obj.robustCholesky(Sigma);
+            x = mu + L * randn(size(mu, 1), 1);
+        end
+
+        function logp = logGaussianPdf(obj, x, mu, Sigma)
+            n = size(mu, 1);
+            L = obj.robustCholesky(Sigma);
+            diff = x - mu;
+            y = L \ diff;
+            maha = y' * y;
+            logDet = 2 * sum(log(abs(diag(L))));
+            logp = -0.5 * (maha + logDet + n * log(2 * pi));
+        end
+
+        function L = robustCholesky(obj, S)
+            Ssym = 0.5 * (S + S');
+            I = eye(size(Ssym, 1));
+
+            [L, p] = chol(Ssym, 'lower');
+            if p == 0
+                return;
+            end
+
+            base = max(1e-12, obj.regJitter);
+            for k = 0:7
+                jitter = base * (10 ^ k);
+                [L, p] = chol(Ssym + jitter * I, 'lower');
+                if p == 0
+                    return;
+                end
+            end
+
+            [V, D] = eig(Ssym);
+            d = max(diag(D), 1e-12);
+            L = V * diag(sqrt(d));
         end
 
     end

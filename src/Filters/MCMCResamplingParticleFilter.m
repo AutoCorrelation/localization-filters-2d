@@ -54,27 +54,31 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
             est = particlesPred * weightsUpd;
 
             % MCMC-based resampling
-            [particlesRes, weightsRes] = obj.mcmcResampleEss(particlesPred, weightsUpd, zNow);
+            [particlesRes, weightsRes, idxAnc] = obj.mcmcResampleEss( ...
+                particlesPred, state.particlesPrev, state.velPrev, weightsUpd, zNow);
 
             % Update state
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            state.velPrev = particlesRes - state.particlesPrev(:, idxAnc);
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
         end
 
-        function [particlesOut, weightsOut] = mcmcResampleEss(obj, particles, weights, zNow)
+        function [particlesOut, weightsOut, idxAnc] = mcmcResampleEss(obj, particles, prevParticles, prevVel, weights, zNow)
             % Check if resampling is needed
             ess = 1 / sum(weights .^ 2);
             if ess >= obj.numParticles * obj.resampleThresholdRatio
                 particlesOut = particles;
                 weightsOut = weights;
+                idxAnc = (1:obj.numParticles)';
                 return;
             end
 
             % Systematic resampling to get parent indices
             idx = obj.systematicResampleIndices(weights, obj.numParticles);
             particlesBase = particles(:, idx);
+            muAnc = prevParticles(:, idx) + prevVel(:, idx) + obj.processBias;
+            idxAnc = idx;
 
             % Apply MH iterations for mixing
             particlesMH = particlesBase;
@@ -95,10 +99,16 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
                         llhCurrent = obj.computeLogLikelihood(zNow, yPredCurrent);
                         llhProposal = obj.computeLogLikelihood(zNow, yPredProposal);
 
+                        % Transition prior term for MH target:
+                        % pi(x) ∝ p(z_k|x) * p(x|x_{k-1,ancestor})
+                        lpCurrent = obj.computeLogTransitionPrior(particlesMH(:, i), muAnc(:, i));
+                        lpProposal = obj.computeLogTransitionPrior(xProposal, muAnc(:, i));
+
                         % MH Acceptance Probability
-                        % α = min[1, exp(log p(y|x_new) - log p(y|x_old))]
-                        % (symmetric RW proposal cancels transition ratio)
-                        alpha = min(1, exp(llhProposal - llhCurrent));
+                        % α = min[1, exp((log p(y|x_new)+log p(x_new|x_prev))
+                        %                - (log p(y|x_old)+log p(x_old|x_prev)))]
+                        % Symmetric RW proposal cancels q-ratio.
+                        alpha = min(1, exp((llhProposal + lpProposal) - (llhCurrent + lpCurrent)));
 
                         % Accept/Reject Decision
                         if rand() < alpha
@@ -123,6 +133,13 @@ classdef MCMCResamplingParticleFilter < NonlinearParticleFilter
             errors = zNow - yPred;
             distances = sum((Rinv * errors) .* errors, 1);
             llh = -0.5 * distances;
+        end
+
+        function lp = computeLogTransitionPrior(obj, xNow, muTrans)
+            % Gaussian transition prior approximation from process model.
+            diff = xNow - muTrans;
+            invVar = 1 / (obj.noiseScale ^ 2);
+            lp = -0.5 * sum((diff .^ 2) * invVar);
         end
 
         function idx = systematicResampleIndices(~, weights, N)

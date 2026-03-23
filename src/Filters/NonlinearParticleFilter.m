@@ -18,9 +18,13 @@ classdef NonlinearParticleFilter < LinearParticleFilter
             weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
 
             est = particlesPred * weightsUpd;
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;

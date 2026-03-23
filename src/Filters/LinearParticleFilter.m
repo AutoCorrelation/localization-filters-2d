@@ -57,9 +57,13 @@ classdef LinearParticleFilter
             weightsUpd = obj.updateWeightsLinear(particlesPred, state.weights, zNow, Rmat);
 
             est = particlesPred * weightsUpd;
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
@@ -97,17 +101,24 @@ classdef LinearParticleFilter
         end
 
         function [particlesOut, weightsOut] = resampleEss(obj, particles, weights)
+            [particlesOut, weightsOut, ~, ~] = obj.resampleEssWithIndices(particles, weights);
+        end
+
+        function [particlesOut, weightsOut, idx, didResample] = resampleEssWithIndices(obj, particles, weights)
             ess = 1 / sum(weights .^ 2);
             if ess < obj.numParticles * obj.resampleThresholdRatio
                 wtc = cumsum(weights);
                 rpt = rand(obj.numParticles, 1);
                 [~, ind1] = sort([rpt; wtc]);
-                ind = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
-                particlesOut = particles(:, ind);
+                idx = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
+                particlesOut = particles(:, idx);
                 weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
+                didResample = true;
             else
                 particlesOut = particles;
                 weightsOut = weights;
+                idx = (1:obj.numParticles)';
+                didResample = false;
             end
         end
     end
