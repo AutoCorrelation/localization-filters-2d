@@ -1,5 +1,5 @@
-function [RMSE, MAE] = evaluateFilter(estimatedPos, startPoint)
-    % EVALUATEFILTER Compute RMSE/MAE for filter performance
+function [RMSE, APE] = evaluateFilter(estimatedPos, startPoint)
+    % EVALUATEFILTER Compute RMSE/APE for filter performance
     % Ground truth: diagonal constant velocity path (1,1) to (10,10)
     %   
     % Inputs:
@@ -8,7 +8,7 @@ function [RMSE, MAE] = evaluateFilter(estimatedPos, startPoint)
     %
     % Outputs:
     %   RMSE    - Root Mean Square Error
-    %   MAE     - Mean Absolute Error (optional 3rd output)
+    %   APE     - Average Position Error
     
     if nargin < 2 || isempty(startPoint)
         startPoint = 3;
@@ -30,6 +30,6 @@ function [RMSE, MAE] = evaluateFilter(estimatedPos, startPoint)
         end
     end
 
-    MAE = mean(errors);
+    APE = mean(errors);
     RMSE = sqrt(mean(errors .^ 2));
 end

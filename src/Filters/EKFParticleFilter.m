@@ -1,7 +1,7 @@
 classdef EKFParticleFilter < NonlinearParticleFilter
     % EKFParticleFilter
     %
-    % Fully corrected EKF-proposal particle filter:
+    % EKF-proposal particle filter:
     %   q(x_k|x_{k-1}, z_k) = N(mu_q, P_q) from per-particle EKF update
     %   w_k^i proportional to w_{k-1}^i * p(z_k|x_k^i) * p(x_k^i|x_{k-1}^i) / q(x_k^i|x_{k-1}^i, z_k)
 
@@ -208,6 +208,5 @@ classdef EKFParticleFilter < NonlinearParticleFilter
             d = max(diag(D), 1e-12);
             L = V * diag(sqrt(d));
         end
-
     end
 end

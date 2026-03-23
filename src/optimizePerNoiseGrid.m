@@ -78,21 +78,21 @@ for filterIdx = 1:numel(targetFilters)
 
     fprintf('\n=== Final Test Evaluation with Per-noise Best Params: %s ===\n', filterSpec.name);
     testRMSE = nan(numNoise, 1);
-    testMAE = nan(numNoise, 1);
+    testAPE = nan(numNoise, 1);
 
     for noiseIdx = 1:numNoise
         testFactory = @(d, c, n) filterSpec.factory(d, c, n, bestBeta(noiseIdx), bestLambdaR(noiseIdx));
-        [testRMSE(noiseIdx), testMAE(noiseIdx)] = evalSingleNoiseFilterWithMAE( ...
+        [testRMSE(noiseIdx), testAPE(noiseIdx)] = evalSingleNoiseFilterWithAPE( ...
             testFactory, testData, config, noiseIdx, opt.finalIterations, baseSeed + 5000 + noiseIdx);
     end
 
     fprintf('\n[Best Params] %s\n', filterSpec.name);
-    fprintf('Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testMAE\n');
+    fprintf('Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testAPE\n');
     fprintf('--------------------------------------------------------------------------\n');
     for i = 1:numNoise
         fprintf('%.0e | %.4f | %.4f | %.6f | %.6f | %.6f | %.6f\n', ...
             config.noiseVariance(i), bestBeta(i), bestLambdaR(i), ...
-            bestTrainRMSE(i), bestValRMSE(i), testRMSE(i), testMAE(i));
+            bestTrainRMSE(i), bestValRMSE(i), testRMSE(i), testAPE(i));
     end
 
     results.(filterSpec.resultPrefix).bestBeta = bestBeta;
@@ -100,7 +100,7 @@ for filterIdx = 1:numel(targetFilters)
     results.(filterSpec.resultPrefix).bestTrainRMSE = bestTrainRMSE;
     results.(filterSpec.resultPrefix).bestValRMSE = bestValRMSE;
     results.(filterSpec.resultPrefix).testRMSE = testRMSE;
-    results.(filterSpec.resultPrefix).testMAE = testMAE;
+    results.(filterSpec.resultPrefix).testAPE = testAPE;
 end
 
 resultFile = fullfile(config.pathResult, 'per_noise_gridsearch_AdaptiveParticleFilter_and_ResidualSquaredAdaptiveParticleFilter.mat');
@@ -166,10 +166,10 @@ function dataOut = splitDataBySample(dataIn, splitName, splitRatios, splitSeed)
 end
 
 function rmse = evalSingleNoiseFilter(filterFactory, data, config, noiseIdx, numIterations, seed)
-    [rmse, ~] = evalSingleNoiseFilterWithMAE(filterFactory, data, config, noiseIdx, numIterations, seed);
+    [rmse, ~] = evalSingleNoiseFilterWithAPE(filterFactory, data, config, noiseIdx, numIterations, seed);
 end
 
-function [rmse, mae] = evalSingleNoiseFilterWithMAE(filterFactory, data, config, noiseIdx, numIterations, seed)
+function [rmse, ape] = evalSingleNoiseFilterWithAPE(filterFactory, data, config, noiseIdx, numIterations, seed)
     rng(seed, 'twister');
 
     filterObj = filterFactory(data, config, noiseIdx);
@@ -192,5 +192,5 @@ function [rmse, mae] = evalSingleNoiseFilterWithMAE(filterFactory, data, config,
         end
     end
 
-    [rmse, mae] = evaluateFilter(estNoise, 3);
+    [rmse, ape] = evaluateFilter(estNoise, 3);
 end

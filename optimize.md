@@ -5,7 +5,7 @@
 ## Final Test Evaluation with Per-noise Best Params
 ### [Best Params] AdaptiveParticleFilter  
 
-|Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testMAE|
+|Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testAPE|
 |-------|---|-|-|-|-|-----------------------------------------------------------|
 |1e-02 | 0.9900 | 20.0000 | 0.091420 | 0.086193 | 0.087478 | 0.077063|
 |1e-01 | 0.9800 | 10.0000 | 0.280993 | 0.277275 | 0.279338 | 0.245379|
@@ -14,7 +14,7 @@
 |1e+02 | 0.9900 | 10.0000 | 5.001979 | 4.933100 | 5.197699 | 4.471249|
 
 ### [Best Params] ResidualSquaredAdaptiveParticleFilter
-|Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testMAE|
+|Noise | bestBeta | bestLambdaR | trainRMSE | valRMSE | testRMSE | testAPE|
 |-----------|-|-|-|-|-|---------------------------------------------------------|
 |1e-02 | 0.9900 | 20.0000 | 0.091323 | 0.086224 | 0.087361 | 0.076907|
 |1e-01 | 0.9900 | 20.0000 | 0.281206 | 0.277203 | 0.278588 | 0.244650|

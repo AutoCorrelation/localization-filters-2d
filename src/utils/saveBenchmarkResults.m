@@ -1,34 +1,34 @@
-function savedPaths = saveBenchmarkResults(resultDir, particleCount, maeTable, runtimeTable)
+function savedPaths = saveBenchmarkResults(resultDir, particleCount, apeTable, runtimeTable)
 % SAVEBENCHMARKRESULTS Save per-particle-count benchmark outputs.
-% Saves MAE CSV (with embedded runtime row).
+% Saves APE CSV (with embedded runtime row).
 
     particleCountTag = sprintf('N%d', round(particleCount));
     resultBaseName = sprintf('benchmark_%s', particleCountTag);
 
-    maeWithRuntime = localInsertRuntimeUnderVariance100(maeTable, runtimeTable);
+    apeWithRuntime = localInsertRuntimeUnderVariance100(apeTable, runtimeTable);
 
-    maeCsvPath = fullfile(resultDir, [resultBaseName '_MAE.csv']);
+    apeCsvPath = fullfile(resultDir, [resultBaseName '_APE.csv']);
 
-    writetable(maeWithRuntime, maeCsvPath);
+    writetable(apeWithRuntime, apeCsvPath);
 
     savedPaths = struct();
-    savedPaths.maeCsvPath = maeCsvPath;
-    savedPaths.maeTableWithRuntime = maeWithRuntime;
+    savedPaths.apeCsvPath = apeCsvPath;
+    savedPaths.apeTableWithRuntime = apeWithRuntime;
 end
 
-function outTable = localInsertRuntimeUnderVariance100(maeTable, runtimeTable)
-    if ~ismember('RowType', maeTable.Properties.VariableNames)
-        maeTable = addvars(maeTable, repmat("MAE", height(maeTable), 1), ...
+function outTable = localInsertRuntimeUnderVariance100(apeTable, runtimeTable)
+    if ~ismember('RowType', apeTable.Properties.VariableNames)
+        apeTable = addvars(apeTable, repmat("APE", height(apeTable), 1), ...
             'Before', 1, 'NewVariableNames', 'RowType');
     else
-        maeTable.RowType(:) = "MAE";
+        apeTable.RowType(:) = "APE";
     end
 
-    runtimeRow = array2table(nan(1, width(maeTable)), 'VariableNames', maeTable.Properties.VariableNames);
+    runtimeRow = array2table(nan(1, width(apeTable)), 'VariableNames', apeTable.Properties.VariableNames);
     runtimeRow.RowType = "RuntimeSec";
     runtimeRow.NoiseVariance = 100;
 
-    variableNames = maeTable.Properties.VariableNames;
+    variableNames = apeTable.Properties.VariableNames;
     for cIdx = 1:numel(variableNames)
         filterName = variableNames{cIdx};
         if strcmp(filterName, 'RowType') || strcmp(filterName, 'NoiseVariance')
@@ -41,15 +41,15 @@ function outTable = localInsertRuntimeUnderVariance100(maeTable, runtimeTable)
         end
     end
 
-    insertAfter = find(maeTable.NoiseVariance == 100, 1, 'first');
+    insertAfter = find(apeTable.NoiseVariance == 100, 1, 'first');
     if isempty(insertAfter)
-        outTable = [maeTable; runtimeRow];
+        outTable = [apeTable; runtimeRow];
         return;
     end
 
-    if insertAfter == height(maeTable)
-        outTable = [maeTable; runtimeRow];
+    if insertAfter == height(apeTable)
+        outTable = [apeTable; runtimeRow];
     else
-        outTable = [maeTable(1:insertAfter, :); runtimeRow; maeTable(insertAfter+1:end, :)];
+        outTable = [apeTable(1:insertAfter, :); runtimeRow; apeTable(insertAfter+1:end, :)];
     end
 end
