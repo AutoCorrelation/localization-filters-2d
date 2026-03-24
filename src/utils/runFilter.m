@@ -19,6 +19,7 @@ function [estimatedPos, metric] = runFilter(filterClass, data, config)
     parfor noiseIdx = 1:numNoise
         filterObj = localCreateFilter(filterClass, data, config, noiseIdx);
         estNoise = zeros(2, numPoints, numIterations);
+        truePosNoise = localSelectTruePos(data, noiseIdx, numPoints, numIterations);
 
         for iterIdx = 1:numIterations
             state = filterObj.initializeState(numPoints);
@@ -33,10 +34,14 @@ function [estimatedPos, metric] = runFilter(filterClass, data, config)
         end
 
         estimatedPos(:, :, :, noiseIdx) = estNoise;
-        [RMSE(noiseIdx), APE(noiseIdx)] = evaluateFilter(estNoise, 3);
+        [RMSE(noiseIdx), APE(noiseIdx)] = evaluateFilter(estNoise, 3, truePosNoise);
     end
     metric.RMSE = RMSE;
     metric.APE = APE;
+end
+
+function truePosNoise = localSelectTruePos(data, noiseIdx, numPoints, numIterations)
+    truePosNoise = data.true_state(1:2, 1:numPoints, 1:numIterations, noiseIdx);
 end
 
 function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
@@ -69,6 +74,8 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
         case {'beliefrougheningadaptiveparticlefilter', 'brapf'}
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = BeliefRougheningAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'rougheningprioreditingparticlefilter', 'rpepf'}
+            filterObj = RougheningPriorEditingParticleFilter(data, config, noiseIdx);
 
         otherwise
             error('runFilter:UnsupportedFilter', 'Unsupported filterClass: %s', char(filterClass));

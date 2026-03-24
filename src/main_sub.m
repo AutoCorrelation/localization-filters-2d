@@ -7,7 +7,7 @@ addpath('./utils');
 initializeParpool(5);
 basic = initializeConfig;
 % dataGenerate(basic);
-particleCounts = [10, 50, 100, 200, 500, 1000, 2000];
+particleCounts = [10, 50, 100, 200, 500];
 
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 resultDir = fullfile(projectRoot, 'result');
@@ -25,24 +25,27 @@ filterNames = {
     'AdaptiveParticleFilter', ...
     'BeliefQShrinkAdaptiveParticleFilter', ...
     'RDiagPriorEditAdaptiveParticleFilter', ...
-    'BeliefRougheningAdaptiveParticleFilter'
+    'BeliefRougheningAdaptiveParticleFilter', ...
+    'RougheningPriorEditingParticleFilter'
 };
 filterClasses = filterNames;
 
-apeVarNames = { ...
-    'NoiseVariance', 'Baseline', 'LinearKalmanFilter_DecayQ', ...
-    'NonlinearParticleFilter', ...
-    'EKFParticleFilter', ...
-    'AdaptiveParticleFilter', ...
-    'BeliefQShrinkAdaptiveParticleFilter', 'RDiagPriorEditAdaptiveParticleFilter', ...
-    'BeliefRougheningAdaptiveParticleFilter'};
+apeVarNames = [{'NoiseVariance'}, filterNames];
 
 for nIdx = 1:numel(particleCounts)
     config = initializeConfig(particleCounts(nIdx));
     rng(42, 'twister'); % for reproducibility
 
+    % Uncomment below to regenerate data with current config.motionModel setting
     % dataGenerate(config);
-    h5File = fullfile(config.pathData, 'simulation_data.h5');
+    
+    % Select h5 file based on motion model
+    if strcmpi(config.motionModel, 'imm')
+        h5FileName = 'simulation_data_imm.h5';
+    else
+        h5FileName = 'simulation_data.h5';
+    end
+    h5File = fullfile(config.pathData, h5FileName);
     data = loadSimulationData(h5File);
 
     numFilters = numel(filterClasses);
@@ -76,18 +79,9 @@ for nIdx = 1:numel(particleCounts)
     end
     fprintf('\n');
 
-    plotMetricComparison(config.noiseVariance, ...
-        apeMatrix(:, 1), ...
-        apeMatrix(:, 2), ...
-        apeMatrix(:, 3), ...
-        apeMatrix(:, 4), ...
-        apeMatrix(:, 5), ...
-        apeMatrix(:, 6), ...
-        apeMatrix(:, 7), ...
-        apeMatrix(:, 8), ...
-        runtimeTable, config.numParticles);
+    plotMetricComparison(config.noiseVariance, apeMatrix, filterNames, runtimeTable, config.numParticles, resultDir, config.motionModel);
 
-    savedPaths = saveBenchmarkResults(resultDir, config.numParticles, apeTable, runtimeTable);
+    savedPaths = saveBenchmarkResults(resultDir, config.numParticles, apeTable, runtimeTable, config.motionModel);
     fprintf('Saved per-N files:\n');
     fprintf(' - %s\n', savedPaths.apeCsvPath);
     fprintf('\n');
@@ -98,7 +92,8 @@ for nIdx = 1:numel(particleCounts)
 
 end
 
-allApeCsvPath = fullfile(resultDir, sprintf('benchmark_batch_APE_AllN.csv'));
+motionPrefix = sprintf('%s_', basic.motionModel);
+allApeCsvPath = fullfile(resultDir, sprintf('benchmark_%sbatch_APE_AllN.csv', motionPrefix));
 writetable(allApeTable, allApeCsvPath);
 
 fprintf('Saved aggregated files:\n');

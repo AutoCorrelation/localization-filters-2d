@@ -6,14 +6,14 @@ classdef CustomNonlinearParticleFilter < NonlinearParticleFilter
     methods
         function obj = CustomNonlinearParticleFilter(data, config, noiseIdx)
             obj@NonlinearParticleFilter(data, config, noiseIdx);
-            % 추�? 커스?� ?�라미터/로직?� ?�기??구현
+            % Additional custom parameters/logic can be implemented here
         end
 
         function state = initializeState(obj, numPoints)
             state = initializeState@NonlinearParticleFilter(obj, numPoints);
             state.M = zeros(4, obj.numParticles); % AdaBelief 1st moment
-            state.S = zeros(4, obj.numParticles); % AdaBelief 2nd
-            % 커스?� 초기??로직???�요??경우 ?�기??추�?
+            state.S = zeros(4, obj.numParticles); % AdaBelief 2nd moment
+            % Add custom initialization logic if needed
         end
 
         function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow)

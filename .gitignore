@@ -7,4 +7,4 @@ __pycache__/
 .vscode/  
 .github/
 result/
-*.csv
+src/archives/a_results

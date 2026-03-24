@@ -1,6 +1,6 @@
 classdef BeliefRougheningAdaptiveParticleFilter < AdaptiveParticleFilter
     % BeliefRougheningAdaptiveParticleFilter
-    % s_k???�라 roughening 강도�??�적?�로 조절?�다.
+    % Based on belief ratio (s_k), dynamically adjust roughening strength
 
     properties
         rougheningKBase  (1,1) double = 0.2

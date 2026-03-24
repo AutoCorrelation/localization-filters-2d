@@ -1,6 +1,4 @@
 classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
-    % RDiagPriorEditAdaptiveParticleFilter
-    % R inflation?�로 ?��? diag(R_k)�?prior editing gate???�용?�다.
 
     properties
         priorSigmaGate  (1,1) double = 6.0
@@ -31,7 +29,8 @@ classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
             yPredWeighted = obj.H_nonlinear(xHatWeighted);
             e = zNow - yPredWeighted;
 
-            state.sMoment = obj.beta * state.sMoment + (1 - obj.beta) * (e .^ 2);
+            state.mMoment = obj.beta * state.mMoment + (1 - obj.beta) * e;
+            state.sMoment = obj.beta * state.sMoment + (1 - obj.beta) * ((e - state.mMoment) .^ 2);
             state.diagR = state.nominalDiagR + obj.lambdaR * state.sMoment;
             state.diagR = min(max(state.diagR, obj.rFloor), obj.rCeil);
 

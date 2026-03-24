@@ -1,6 +1,7 @@
 classdef BeliefQShrinkAdaptiveParticleFilter < AdaptiveParticleFilter
     % BeliefQShrinkAdaptiveParticleFilter
-    % s_k 기반?�로 R inflation???��??�면???�측 ?�이�?Q)�?축소?�다.
+    % Based on belief ratio (s_k), adaptively shrink process noise (Q) covariance
+    % while inflating measurement covariance (R).
 
     properties
         qShrinkGain      (1,1) double = 0.3

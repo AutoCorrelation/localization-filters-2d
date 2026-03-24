@@ -1,9 +1,15 @@
-function savedPaths = saveBenchmarkResults(resultDir, particleCount, apeTable, runtimeTable)
+function savedPaths = saveBenchmarkResults(resultDir, particleCount, apeTable, runtimeTable, motionModel)
 % SAVEBENCHMARKRESULTS Save per-particle-count benchmark outputs.
 % Saves APE CSV (with embedded runtime row).
+% motionModel: 'cv' or 'imm' for filename prefix
 
+    if nargin < 5 || isempty(motionModel)
+        motionModel = 'cv';
+    end
+    
     particleCountTag = sprintf('N%d', round(particleCount));
-    resultBaseName = sprintf('benchmark_%s', particleCountTag);
+    motionPrefix = sprintf('%s_', motionModel);
+    resultBaseName = sprintf('benchmark_%s%s', motionPrefix, particleCountTag);
 
     apeWithRuntime = localInsertRuntimeUnderVariance100(apeTable, runtimeTable);
 
