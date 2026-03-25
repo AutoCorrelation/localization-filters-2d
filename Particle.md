@@ -45,10 +45,10 @@ $$
 　X_t = 0 \\ \\
 
 \textbf{1. Predict Particles(Sampling) } \\
-　p{_m^-}=f(p_m) \\\\
+　p{_m^-}=f(p_m) + \omega_{t-1}\\\\
 
 \textbf{2. Update weights} \\
-　w_m = p(z_k|h(p_m^-)) \\
+　w_m = w_m \cdot p(z_k|h(p_m^-)) \\
 　w_m = {w_m}/{\Sigma w_m}  \\ \\
 
 \textbf{3. Estimate state} \\
@@ -111,16 +111,21 @@ $$
 
 $$
 \begin{array}{l}
-	\textbf{[Step 1 변경: Predict/Sampling]} \\
-\mu_i^- = p_{i,k-1} + v_{i,k-1} + b \\
-q(x_k|x_{k-1},z_k)=\mathcal{N}(\mu_{q,i}, P_{q,i}) \text{ 를 EKF로 구성} \\
+\quad \textbf{[Step 1 변경: EKF proposal 파라미터 도출]} \\
+\mu_i^- = p_{i,k-1} + v_{i,k-1} + b, \quad F_i = \frac{\partial f}{\partial x}\Big|_{\mu_i^-} \;(\text{현재 구현에서는 }F_i=I) \\
+P_{i,k|k-1} = F_i P_{i,k-1} F_i^\top + Q \\
+H_i = \frac{\partial h}{\partial x}\Big|_{\mu_i^-}, \quad
+K_i = P_{i,k|k-1}H_i^\top\left(H_iP_{i,k|k-1}H_i^\top + R_{meas}\right)^{-1} \\
+\mu_{q,i} = \mu_i^- + K_i\left(z_k-h(\mu_i^-)\right) \\
+P_{q,i} = (I-K_iH_i)P_{i,k|k-1}(I-K_iH_i)^\top + K_iR_{meas}K_i^\top \\
 p_{i,k}^- \sim \mathcal{N}(\mu_{q,i}, P_{q,i}) \\
-	\textbf{[Step 2 변경: Weight]} \\
-\log w_i \leftarrow \log w_i + \log p(z_k|p_{i,k}^-) + \log p(p_{i,k}^-|\mu_i^-) - \log q(p_{i,k}^-|\mu_i^-,z_k)
+\quad \textbf{[Step 2 변경: Importance weight + 안정 정규화]} \\
+\log w_i \leftarrow \log w_i + \log p(z_k|p_{i,k}^-;R_{meas}) + \log p(p_{i,k}^-|\mu_i^-,Q) - \log q(p_{i,k}^-|\mu_i^-,z_k) \\
+		ext{Normalize by Log-Sum-Exp: } w_i = \exp\!\left(\log w_i - \log\sum_j \exp(\log w_j)\right)
 \end{array}
 $$
 
-핵심: 단순 process 샘플링 대신 EKF 기반 proposal을 만들고, importance ratio에 `prior/proposal` 보정항이 들어갑니다.
+핵심: 단순 process 샘플링 대신 EKF 기반 proposal을 만들고, `prior/proposal` 보정항 및 log-sum-exp 정규화를 사용합니다. 또한 likelihood와 EKF update에서 동일한 `R_{meas}`를 사용해 측정 공분산 일관성을 유지합니다.
 
 ---
 

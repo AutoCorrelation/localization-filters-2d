@@ -10,6 +10,7 @@ classdef EKFParticleFilter < NonlinearParticleFilter
         initCovariance (2,2) double = 0.1 * eye(2)
 
         Q (2,2) double
+        Rmeas
         regJitter (1,1) double = 1e-9
 
         ekfEnabled (1,1) logical = true
@@ -24,6 +25,12 @@ classdef EKFParticleFilter < NonlinearParticleFilter
                 qScale = max(config.ekfQScale, 1e-6);
             end
             obj.Q = (obj.noiseScale ^ 2) * qScale * eye(2);
+            obj.Rmeas = obj.R;
+
+            if isfield(config, 'ekfRScale')
+                rScale = max(config.ekfRScale, 1e-6);
+                obj.Rmeas = rScale * obj.Rmeas;
+            end
 
             if isfield(config, 'ekfUseDataQ') && config.ekfUseDataQ
                 if isfield(data, 'Q')
@@ -75,15 +82,12 @@ classdef EKFParticleFilter < NonlinearParticleFilter
                 logW = log(max(state.weights(:), 1e-300)) + logLike(:) + logPrior(:) - logProposal(:);
             else
                 particlesProp = muTrans + obj.sampleProcess();
-                proposalCov = obj.particleCovariances;
+                proposalCov = obj.predictCovariances(obj.particleCovariances);
                 logLike = obj.computeLogLikelihood(zNow, obj.H_nonlinear(particlesProp));
                 logW = log(max(state.weights(:), 1e-300)) + logLike(:);
             end
 
-            logW = logW - max(logW);
-            weightsUpd = exp(logW);
-            weightsUpd = weightsUpd + 1e-300;
-            weightsUpd = weightsUpd / sum(weightsUpd);
+            weightsUpd = obj.normalizeLogWeights(logW);
 
             est = particlesProp * weightsUpd;
 
@@ -107,14 +111,16 @@ classdef EKFParticleFilter < NonlinearParticleFilter
         function [samples, covOut, logQ] = sampleEkfProposal(obj, muTrans, covPrev, zNow)
             N = size(muTrans, 2);
             numAnchors = size(zNow, 1);
-            Rk = (obj.noiseScale ^ 2) * eye(numAnchors);
+            Rk = 0.5 * (obj.Rmeas + obj.Rmeas') + obj.regJitter * eye(numAnchors);
+            I2 = eye(2);
 
             samples = zeros(2, N);
             covOut = zeros(2, 2, N);
             logQ = zeros(N, 1);
 
             for i = 1:N
-                Ppred = covPrev(:, :, i) + obj.Q;
+                Fk = obj.computeStateTransitionJacobian(muTrans(:, i));
+                Ppred = Fk * covPrev(:, :, i) * Fk' + obj.Q;
                 Ppred = 0.5 * (Ppred + Ppred');
 
                 xPred = muTrans(:, i);
@@ -128,7 +134,6 @@ classdef EKFParticleFilter < NonlinearParticleFilter
 
                 muQ = xPred + K * (zNow - yPred);
 
-                I2 = eye(2);
                 Pq = (I2 - K * Hk) * Ppred * (I2 - K * Hk)' + K * Rk * K';
                 Pq = 0.5 * (Pq + Pq') + obj.regJitter * eye(2);
 
@@ -155,12 +160,39 @@ classdef EKFParticleFilter < NonlinearParticleFilter
         end
 
         function logLike = computeLogLikelihood(obj, zNow, yPred)
-            numAnchors = size(yPred, 1);
-            invVar = 1 / (obj.noiseScale ^ 2);
+            Rk = 0.5 * (obj.Rmeas + obj.Rmeas') + obj.regJitter * eye(size(obj.Rmeas, 1));
+            L = obj.robustCholesky(Rk);
             err = zNow - yPred;
-            maha = sum((err .^ 2), 1) * invVar;
-            const = numAnchors * log(2 * pi * (obj.noiseScale ^ 2));
+            y = L \ err;
+            maha = sum(y .^ 2, 1);
+            logDetR = 2 * sum(log(abs(diag(L))));
+            const = size(yPred, 1) * log(2 * pi) + logDetR;
             logLike = -0.5 * (maha + const);
+        end
+
+        function Fk = computeStateTransitionJacobian(~, ~)
+            % Transition model: x_k = x_{k-1} + v_{k-1} + b + w_k -> d f / d x = I
+            Fk = eye(2);
+        end
+
+        function covPred = predictCovariances(obj, covIn)
+            N = size(covIn, 3);
+            covPred = zeros(2, 2, N);
+            for i = 1:N
+                Fk = obj.computeStateTransitionJacobian([]);
+                Pi = Fk * covIn(:, :, i) * Fk' + obj.Q;
+                covPred(:, :, i) = 0.5 * (Pi + Pi') + obj.regJitter * eye(2);
+            end
+        end
+
+        function w = normalizeLogWeights(~, logW)
+            % Log-sum-exp normalization for numerical stability.
+            m = max(logW);
+            shifted = logW - m;
+            lse = m + log(sum(exp(shifted)));
+            w = exp(logW - lse);
+            w = w + 1e-300;
+            w = w / sum(w);
         end
 
         function logPrior = computeLogTransitionPrior(obj, particles, muTrans)

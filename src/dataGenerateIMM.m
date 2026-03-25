@@ -38,14 +38,37 @@ end
 if ~isfield(config, 'immInitialState')
     config.immInitialState = [0; 0; 10; 10];
 end
+if ~isfield(config, 'immMotionScale')
+    % Conservative default scale to keep trajectory naturally inside anchor bounds.
+    config.immMotionScale = 0.07;
+end
+if ~isfield(config, 'immProposalMaxTry')
+    % Per-step sampling retries before declaring the trajectory invalid.
+    config.immProposalMaxTry = 60;
+end
+if ~isfield(config, 'immTrajectoryMaxRetry')
+    % Number of times to regenerate a full trajectory if any step exits bounds.
+    config.immTrajectoryMaxRetry = 200;
+end
 
 omegas = config.immOmegas(:).';
 TPM = config.immTPM;
 initialModeProb = config.immInitialModeProb(:);
 x0 = config.immInitialState(:);
+% Force start point to (0,0) as requested.
+x0(1:2) = [0; 0];
+
+motionScale = max(config.immMotionScale, 1e-6);
+x0(3:4) = x0(3:4) * motionScale;
+
+% Keep IMM trajectory inside anchor bounding box.
+anchorMin = min(Anchor, [], 2);
+anchorMax = max(Anchor, [], 2);
 
 dt = config.immDt;
-sigmaV = config.immSigmaV;
+sigmaV = config.immSigmaV * motionScale;
+proposalMaxTry = max(1, round(config.immProposalMaxTry));
+trajectoryMaxRetry = max(1, round(config.immTrajectoryMaxRetry));
 Q4 = [dt^3/3, 0, dt^2/2, 0; ...
       0, dt^3/3, 0, dt^2/2; ...
       dt^2/2, 0, dt, 0; ...
@@ -56,15 +79,24 @@ ranging_cell = cell(numNoises, 1);
 x_hat_LLS_cell = cell(numNoises, 1);
 z_LLS_cell = cell(numNoises, 1);
 R_LLS_cell = cell(numNoises, 1);
-processNoise_cell = cell(numNoises, 1);
-toaNoise_cell = cell(numNoises, 1);
-processbias_cell = cell(numNoises, 1);
-Q_cell = cell(numNoises, 1);
-P0_cell = cell(numNoises, 1);
 
 % Optional debug/analysis tensors
 true_state_cell = cell(numNoises, 1);
 mode_history_cell = cell(numNoises, 1);
+
+% Generate one global random true trajectory shared across all noise levels.
+isValidGlobalTrajectory = false;
+for retryIdx = 1:trajectoryMaxRetry
+    [globalTrueStates, globalModeHistory, isValidGlobalTrajectory] = localGenerateOneIMMRun( ...
+        numPoints, x0, dt, omegas, TPM, initialModeProb, Q4, anchorMin, anchorMax, proposalMaxTry);
+    if isValidGlobalTrajectory
+        break;
+    end
+end
+if ~isValidGlobalTrajectory
+    error('dataGenerateIMM:GlobalTrajectoryGenerationFailed', ...
+        'Failed to generate a shared in-bounds IMM trajectory after %d retries.', trajectoryMaxRetry);
+end
 
 parfor n = 1:numNoises
     noiseVar = noiseVariance(n);
@@ -74,14 +106,13 @@ parfor n = 1:numNoises
     R_LLS_temp = zeros(6, 6, numPoints, numSamples);
     x_hat_LLS_temp = zeros(2, numPoints, numSamples);
 
-    processNoise_temp = zeros(2, numSamples);
-    toaNoise_temp = zeros(2, numSamples);
-
     true_state_temp = zeros(4, numPoints, numSamples);
     mode_history_temp = zeros(numPoints, numSamples);
 
+    % For each sample: reuse one shared true trajectory and add only measurement noise.
     for s = 1:numSamples
-        [trueStates, modeHistory] = localGenerateOneIMMRun(numPoints, x0, dt, omegas, TPM, initialModeProb, Q4);
+        trueStates = globalTrueStates;
+        modeHistory = globalModeHistory;
 
         % Build ranging/LLS observations from generated trajectory
         for k = 1:numPoints
@@ -113,33 +144,14 @@ parfor n = 1:numNoises
             x_hat_LLS_temp(:, k, s) = pinvH * z_LLS_temp(:, k, s);
         end
 
-        % Keep process-noise bank/bias compatible with existing PF code.
-        vel12 = x_hat_LLS_temp(:, 2, s) - x_hat_LLS_temp(:, 1, s);
-        processNoise_temp(:, s) = trueStates(1:2, 3) - x_hat_LLS_temp(:, 2, s) - vel12;
-        toaNoise_temp(:, s) = trueStates(1:2, 2) - x_hat_LLS_temp(:, 2, s);
-
         true_state_temp(:, :, s) = trueStates;
         mode_history_temp(:, s) = modeHistory(:);
     end
-
-    processbias_temp = mean(processNoise_temp, 2);
-    toabias_temp = mean(toaNoise_temp, 2);
-
-    centeredProcess = processNoise_temp - processbias_temp;
-    centeredToa = toaNoise_temp - toabias_temp;
-    Q2 = (centeredProcess * centeredProcess.') / numSamples;
-    P0 = (centeredToa * centeredToa.') / numSamples;
 
     ranging_cell{n} = ranging_temp;
     z_LLS_cell{n} = z_LLS_temp;
     R_LLS_cell{n} = R_LLS_temp;
     x_hat_LLS_cell{n} = x_hat_LLS_temp;
-
-    processNoise_cell{n} = processNoise_temp;
-    toaNoise_cell{n} = toaNoise_temp;
-    processbias_cell{n} = processbias_temp;
-    Q_cell{n} = Q2;
-    P0_cell{n} = P0;
 
     true_state_cell{n} = true_state_temp;
     mode_history_cell{n} = mode_history_temp;
@@ -150,15 +162,54 @@ x_hat_LLS = cat(4, x_hat_LLS_cell{:});
 z_LLS = cat(4, z_LLS_cell{:});
 R_LLS = cat(5, R_LLS_cell{:});
 
-processNoise = cat(3, processNoise_cell{:});
-toaNoise = cat(3, toaNoise_cell{:});
-processbias = cat(2, processbias_cell{:});
-
-Q = cat(3, Q_cell{:});
-P0 = cat(3, P0_cell{:});
-
 true_state = cat(4, true_state_cell{:});
 mode_history = cat(3, mode_history_cell{:});
+
+% Match CV pipeline for Q/P0 estimation from x_hat trajectory statistics.
+vel = x_hat_LLS(:, 2, :, :) - x_hat_LLS(:, 1, :, :);
+vel = squeeze(vel); % 2 x numSamples x numNoises
+
+processNoise = zeros(2, numSamples, numNoises);
+toaNoise = zeros(2, numSamples, numNoises);
+for n = 1:numNoises
+    x2 = squeeze(x_hat_LLS(:, 2, :, n));        % 2 x numSamples
+    velN = squeeze(vel(:, :, n));               % 2 x numSamples
+    p3 = squeeze(true_state(1:2, 3, 1, n));     % 2 x 1
+    p2 = squeeze(true_state(1:2, 2, 1, n));     % 2 x 1
+
+    processNoise(:, :, n) = p3 - x2 - velN;
+    toaNoise(:, :, n) = p2 - x2;
+end
+
+eeT_all = cell(numNoises, 1);
+xxT_all = cell(numNoises, 1);
+parfor n = 1:numNoises
+    eeT_n = zeros(2, 2, numSamples);
+    xxT_n = zeros(2, 2, numSamples);
+
+    for i = 1:numSamples
+        eeT_n(:, :, i) = processNoise(:, i, n) * processNoise(:, i, n)';
+        xxT_n(:, :, i) = toaNoise(:, i, n) * toaNoise(:, i, n)';
+    end
+
+    eeT_all{n} = eeT_n;
+    xxT_all{n} = xxT_n;
+end
+
+eeT = cat(4, eeT_all{:});
+xxT = cat(4, xxT_all{:});
+EeeT = squeeze(mean(eeT, 3));
+ExxT = squeeze(mean(xxT, 3));
+
+processbias = squeeze(mean(processNoise, 2));
+toabias = squeeze(mean(toaNoise, 2));
+
+Q = zeros(2, 2, numNoises);
+P0 = zeros(2, 2, numNoises);
+for n = 1:numNoises
+    Q(:, :, n) = EeeT(:, :, n) - processbias(:, n) * processbias(:, n)';
+    P0(:, :, n) = ExxT(:, :, n) - toabias(:, n) * toabias(:, n)';
+end
 
 % Choose h5 filename based on motion model
 h5FileName = 'simulation_data_imm.h5';
@@ -204,14 +255,21 @@ h5write(h5File, '/mode_history', mode_history);
 fprintf('IMM-compatible data saved to %s\n', h5File);
 end
 
-function [trueStates, modeHistory] = localGenerateOneIMMRun(numSteps, x0, dt, omegas, TPM, initialModeProb, Q4)
+function [trueStates, modeHistory, isValid] = localGenerateOneIMMRun( ...
+    numSteps, x0, dt, omegas, TPM, initialModeProb, Q4, anchorMin, anchorMax, proposalMaxTry)
 trueStates = zeros(4, numSteps);
 modeHistory = zeros(1, numSteps);
+isValid = true;
 
 xk = x0;
 currentMode = localSampleDiscrete(initialModeProb);
 
-for k = 1:numSteps
+% Start exactly from the requested initial point and keep it recorded.
+xk(1:2) = [0; 0];
+trueStates(:, 1) = xk;
+modeHistory(1) = currentMode;
+
+for k = 2:numSteps
     currentMode = localSampleDiscrete(TPM(currentMode, :).');
     modeHistory(k) = currentMode;
 
@@ -231,10 +289,34 @@ for k = 1:numSteps
              0, 0, s, c];
     end
 
-    wk = localMvnrnd4(Q4);
-    xk = F * xk + wk;
+    [xk, ok] = localProposeInsideBounds(xk, F, Q4, anchorMin, anchorMax, proposalMaxTry);
+    if ~ok
+        isValid = false;
+        return;
+    end
     trueStates(:, k) = xk;
 end
+end
+
+function [xNext, ok] = localProposeInsideBounds(x, F, Q4, lowerBound, upperBound, maxTry)
+% Draw process noise until predicted state remains inside bounds.
+for t = 1:maxTry
+    wk = localMvnrnd4(Q4);
+    % Shrink process noise as retries increase to improve acceptance.
+    wk = wk * (0.92 ^ (t - 1));
+    cand = F * x + wk;
+    if localIsInsideBox(cand(1:2), lowerBound, upperBound)
+        xNext = cand;
+        ok = true;
+        return;
+    end
+end
+xNext = x;
+ok = false;
+end
+
+function tf = localIsInsideBox(pos, lowerBound, upperBound)
+tf = all(pos >= lowerBound) && all(pos <= upperBound);
 end
 
 function idx = localSampleDiscrete(prob)

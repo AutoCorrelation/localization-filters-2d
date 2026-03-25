@@ -7,7 +7,7 @@ addpath('./utils');
 initializeParpool(5);
 basic = initializeConfig;
 % dataGenerate(basic);
-particleCounts = [10, 50, 100, 200, 500];
+particleCounts = [10, 50, 100, 200, 500, 1e3];
 
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 resultDir = fullfile(projectRoot, 'result');

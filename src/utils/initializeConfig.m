@@ -5,7 +5,7 @@ function config = initializeConfig(numParticle)
     config.pathData = '../data/';
     config.pathResult = '../result/';
     config.numSamples = 1e5;
-    config.iterations = 5e2;
+    config.iterations = 1e3;
     config.noiseVariance = [1e-2, 1e-1, 1, 1e1, 1e2];
     config.numPoints = 10;
     config.Anchor = [0 10; 0 0; 10 0; 10 10]';
@@ -19,8 +19,8 @@ function config = initializeConfig(numParticle)
     config.pinvH = pinv(config.H);
 
     % Motion model selector: set ONE of the following as active
-    % config.motionModel = 'cv';          % Use Constant-Velocity trajectory (default)
-    config.motionModel = 'imm';       % Use IMM (CV/CT) trajectory (uncomment to use)
+    config.motionModel = 'cv';          % Use Constant-Velocity trajectory (default)
+    % config.motionModel = 'imm';       % Use IMM (CV/CT) trajectory (uncomment to use)
 
     if nargin > 0
         config.numParticles = numParticle;

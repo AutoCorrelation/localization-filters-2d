@@ -88,8 +88,8 @@ R_LLS = cat(5, R_LLS_cell{:});
 true_state = cat(4, true_state_cell{:});
 mode_history = cat(3, mode_history_cell{:});
 
-Q = zeros(2, 2, 5);
-P0 = zeros(2,2,5);
+Q = zeros(2, 2, numNoises);
+P0 = zeros(2, 2, numNoises);
 vel = x_hat_LLS(:,2,:,:) - x_hat_LLS(:,1,:,:);
 vel = squeeze(vel);
 p3 = true_pos(:,3);
@@ -97,9 +97,9 @@ p2 = true_pos(:,2);
 processNoise = p3 - squeeze(x_hat_LLS(:,2,:,:)) - vel;
 toaNoise = p2 - squeeze(x_hat_LLS(:,2,:,:));
 
-eeT_all = cell(5, 1);
-xxT_all = cell(5, 1);
-parfor n = 1:5
+eeT_all = cell(numNoises, 1);
+xxT_all = cell(numNoises, 1);
+parfor n = 1:numNoises
     eeT_n = zeros(2, 2, numSamples);
     xxT_n = zeros(2, 2, numSamples);
 
@@ -119,7 +119,7 @@ ExxT = squeeze(mean(xxT, 3));
 
 processbias = squeeze(mean(processNoise, 2));
 toabias = squeeze(mean(toaNoise, 2));
-for n = 1:5
+for n = 1:numNoises
     Q(:, :, n) = EeeT(:, :, n) - processbias(:, n) * processbias(:, n)';
     P0(:, :, n) = ExxT(:, :, n) - toabias(:, n) * toabias(:, n)';
 end
