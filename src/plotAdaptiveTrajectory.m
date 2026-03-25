@@ -7,8 +7,8 @@ close all;
 
 %% User settings
 particleCount = 500;
-noiseIdx = 1;        % 1..numel(config.noiseVariance)
-sampleIdx = 1;       % 1..size(data.x_hat_LLS, 3)
+noiseIdx = 5;        % 1..numel(config.noiseVariance)
+sampleIdx = 100;       % 1..size(data.x_hat_LLS, 3)
 showEveryKPoints = 1; % Particle scatter stride over trajectory points
 saveFigure = false;
 if evalin('base', "exist('SAVE_TRAJ_FIG','var')")

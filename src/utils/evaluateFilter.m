@@ -9,7 +9,7 @@ function [RMSE, APE] = evaluateFilter(estimatedPos, startPoint, truePos)
     %                  (2, numPoints) or (2, numPoints, numIterations)
     %
     % Outputs:
-    %   RMSE    - Root Mean Square Error
+    %   RMSE    - Root Mean Square Error (primary metric)
     %   APE     - Average Position Error
     
     if nargin < 2 || isempty(startPoint)
@@ -35,7 +35,8 @@ function [RMSE, APE] = evaluateFilter(estimatedPos, startPoint, truePos)
     end
 
     numEvaluations = (numPoints - startPoint + 1) * numIterations;
-    errors = zeros(numEvaluations, 1);
+    errors = zeros(numEvaluations, 1);    % Euclidean (for APE)
+    errorsSq = zeros(numEvaluations, 1);  % squared Euclidean (for RMSE)
     writeIdx = 1;
     
     for iterIdx = 1:numIterations
@@ -45,12 +46,14 @@ function [RMSE, APE] = evaluateFilter(estimatedPos, startPoint, truePos)
             else
                 gt = [pointIdx; pointIdx];
             end
-            errVal = norm(estimatedPos(:, pointIdx, iterIdx) - gt);
-            errors(writeIdx) = errVal;
+            d = estimatedPos(:, pointIdx, iterIdx) - gt;
+            errSq = d(1)^2 + d(2)^2;        % squared 2D error (dx^2 + dy^2)
+            errorsSq(writeIdx) = errSq;
+            errors(writeIdx) = sqrt(errSq); % Euclidean distance (for APE)
             writeIdx = writeIdx + 1;
         end
     end
 
+    RMSE = sqrt(mean(errorsSq));
     APE = mean(errors);
-    RMSE = sqrt(mean(errors .^ 2));
 end

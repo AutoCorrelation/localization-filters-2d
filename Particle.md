@@ -140,7 +140,7 @@ $$
 \hat{x}_k = \sum_i w_i p_{i,k}^- ,\quad \hat{y}_k = h(\hat{x}_k),\quad e_k = z_k-\hat{y}_k \\
 m \leftarrow \beta m + (1-\beta)e_k \\
 s \leftarrow \beta s + (1-\beta)(e_k-m)^2 \\
-	\text{diag}R_k \leftarrow \text{clip}(\text{diag}R_{nom}+\lambda_R s,\; r_{floor},\; r_{ceil}) \\
+	\text{diag}R_k \leftarrow \text{diag}R_{nom}+\lambda_R s \\
 	\textbf{[Step 2 변경]} \\
 w_m \propto w_m \cdot \exp\!\left(-\frac{1}{2}(z_k-h(p_m^-))^\top R_k^{-1}(z_k-h(p_m^-))\right)
 \end{array}
@@ -150,7 +150,7 @@ $$
 
 ---
 
-### 3.6 BeliefQShrinkAdaptiveParticleFilter (belief에 따른 Q 축소)
+### 3.6 BeliefQShrinkAdaptiveParticleFilter (belief에 따른 Q 축소, 보관됨)
 `AdaptiveParticleFilter` 대비 변경점:
 
 $$
@@ -162,11 +162,11 @@ p_m^- = p_m + v_m + b + q_{scale}\,\epsilon_m
 \end{array}
 $$
 
-핵심: belief ratio가 커질수록 process 확산을 줄이는 방향으로 `Q`를 스케일링합니다.
+핵심: belief ratio가 커질수록 process 확산을 줄이는 방향으로 `Q`를 스케일링합니다. 현재는 `src/archives/a_Filters`로 이동되어 활성 비교에서는 제외됩니다.
 
 ---
 
-### 3.7 BeliefRougheningAdaptiveParticleFilter (belief에 따른 roughening 강도 조절)
+### 3.7 BeliefRougheningAdaptiveParticleFilter (belief에 따른 roughening 강도 조절, 보관됨)
 `AdaptiveParticleFilter` 대비 변경점:
 
 $$
@@ -179,7 +179,7 @@ k_{rough} = \min\left(k_0(1+g_r\rho),\; k_{max}\right) \\
 \end{array}
 $$
 
-핵심: resampling 뒤에 주입하는 roughening 노이즈 세기를 belief 상태로 동적으로 조절합니다.
+핵심: resampling 뒤에 주입하는 roughening 노이즈 세기를 belief 상태로 동적으로 조절합니다. 현재는 `src/archives/a_Filters`로 이동되어 활성 비교에서는 제외됩니다.
 
 ---
 

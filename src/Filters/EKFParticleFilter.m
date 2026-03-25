@@ -24,7 +24,7 @@ classdef EKFParticleFilter < NonlinearParticleFilter
             if isfield(config, 'ekfQScale')
                 qScale = max(config.ekfQScale, 1e-6);
             end
-            obj.Q = (obj.noiseScale ^ 2) * qScale * eye(2);
+            obj.Q = (obj.noiseStd ^ 2) * qScale * eye(2);
             obj.Rmeas = obj.R;
 
             if isfield(config, 'ekfRScale')

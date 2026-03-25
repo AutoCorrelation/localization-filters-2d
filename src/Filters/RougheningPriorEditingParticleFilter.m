@@ -50,7 +50,7 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
 
         function particlesOut = applyPriorEditing(obj, particlesIn, prevParticles, velPrev, zNow)
             particlesOut = particlesIn;
-            gate = obj.priorSigmaGate * obj.noiseScale;
+            gate = obj.priorSigmaGate * obj.noiseStd;
 
             validMask = obj.isWithinGate(particlesOut, zNow, gate);
             rejectIdx = find(~validMask);
@@ -111,7 +111,7 @@ classdef RougheningPriorEditingParticleFilter < NonlinearParticleFilter
 
         function noise = sampleProcessSingle(obj)
             if isempty(obj.processNoise)
-                noise = obj.noiseScale * randn(2, 1);
+                noise = obj.noiseStd * randn(2, 1);
                 return;
             end
 

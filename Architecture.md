@@ -14,10 +14,12 @@ localization-filters-2d/
 │  │  ├─ NonlinearParticleFilter.m       # 비선형 PF
 │  │  ├─ EKFParticleFilter.m             # EKF 결합 PF
 │  │  ├─ AdaptiveParticleFilter.m        # 적응형 PF
-│  │  ├─ BeliefQShrinkAdaptiveParticleFilter.m
 │  │  ├─ RDiagPriorEditAdaptiveParticleFilter.m
-│  │  ├─ BeliefRougheningAdaptiveParticleFilter.m
 │  │  └─ RougheningPriorEditingParticleFilter.m
+│  ├─ archives/
+│  │  ├─ a_Filters/
+│  │  │  ├─ BeliefQShrinkAdaptiveParticleFilter.m   # 보관(활성 비교 제외)
+│  │  │  └─ BeliefRougheningAdaptiveParticleFilter.m # 보관(활성 비교 제외)
 │  ├─ utils/
 │  │  ├─ initializeConfig.m              # 공통 설정/상수/경로/노이즈 레벨
 │  │  ├─ runFilter.m                     # 필터 팩토리 + 노이즈 레벨 병렬 실행 파이프라인

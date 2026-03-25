@@ -7,7 +7,7 @@ classdef NonlinearParticleFilter < LinearParticleFilter
         function obj = NonlinearParticleFilter(data, config, noiseIdx)
             obj@LinearParticleFilter(data, config, noiseIdx);
             obj.z = squeeze(data.ranging(:, :, :, noiseIdx));
-            obj.R = config.noiseVariance(noiseIdx) * eye(size(data.ranging, 1));
+            obj.R = 4* config.noiseVariance(noiseIdx) * eye(size(data.ranging, 1));
             obj.anchorPos = config.Anchor';
         end
 
@@ -46,7 +46,7 @@ classdef NonlinearParticleFilter < LinearParticleFilter
         function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow)
             yPred = obj.H_nonlinear(particles);
             numAnchors = size(yPred, 1);
-            Rinv = eye(numAnchors) / (obj.noiseScale^2);
+            Rinv = eye(numAnchors) / (obj.noiseStd^2);
             errors = zNow - yPred;
             distances = sum((Rinv * errors) .* errors, 1);
 

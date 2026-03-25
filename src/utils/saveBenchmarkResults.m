@@ -1,6 +1,6 @@
-function savedPaths = saveBenchmarkResults(resultDir, particleCount, apeTable, runtimeTable, motionModel)
+function savedPaths = saveBenchmarkResults(resultDir, particleCount, rmseTable, runtimeTable, motionModel)
 % SAVEBENCHMARKRESULTS Save per-particle-count benchmark outputs.
-% Saves APE CSV (with embedded runtime row).
+% Saves RMSE CSV (with embedded runtime row).
 % motionModel: 'cv' or 'imm' for filename prefix
 
     if nargin < 5 || isempty(motionModel)
@@ -11,30 +11,30 @@ function savedPaths = saveBenchmarkResults(resultDir, particleCount, apeTable, r
     motionPrefix = sprintf('%s_', motionModel);
     resultBaseName = sprintf('benchmark_%s%s', motionPrefix, particleCountTag);
 
-    apeWithRuntime = localInsertRuntimeUnderVariance100(apeTable, runtimeTable);
+    rmseWithRuntime = localInsertRuntimeUnderVariance100(rmseTable, runtimeTable);
 
-    apeCsvPath = fullfile(resultDir, [resultBaseName '_APE.csv']);
+    rmseCsvPath = fullfile(resultDir, [resultBaseName '_RMSE.csv']);
 
-    writetable(apeWithRuntime, apeCsvPath);
+    writetable(rmseWithRuntime, rmseCsvPath);
 
     savedPaths = struct();
-    savedPaths.apeCsvPath = apeCsvPath;
-    savedPaths.apeTableWithRuntime = apeWithRuntime;
+    savedPaths.rmseCsvPath = rmseCsvPath;
+    savedPaths.rmseTableWithRuntime = rmseWithRuntime;
 end
 
-function outTable = localInsertRuntimeUnderVariance100(apeTable, runtimeTable)
-    if ~ismember('RowType', apeTable.Properties.VariableNames)
-        apeTable = addvars(apeTable, repmat("APE", height(apeTable), 1), ...
+function outTable = localInsertRuntimeUnderVariance100(rmseTable, runtimeTable)
+    if ~ismember('RowType', rmseTable.Properties.VariableNames)
+        rmseTable = addvars(rmseTable, repmat("RMSE", height(rmseTable), 1), ...
             'Before', 1, 'NewVariableNames', 'RowType');
     else
-        apeTable.RowType(:) = "APE";
+        rmseTable.RowType(:) = "RMSE";
     end
 
-    runtimeRow = array2table(nan(1, width(apeTable)), 'VariableNames', apeTable.Properties.VariableNames);
+    runtimeRow = array2table(nan(1, width(rmseTable)), 'VariableNames', rmseTable.Properties.VariableNames);
     runtimeRow.RowType = "RuntimeSec";
     runtimeRow.NoiseVariance = 100;
 
-    variableNames = apeTable.Properties.VariableNames;
+    variableNames = rmseTable.Properties.VariableNames;
     for cIdx = 1:numel(variableNames)
         filterName = variableNames{cIdx};
         if strcmp(filterName, 'RowType') || strcmp(filterName, 'NoiseVariance')
@@ -47,15 +47,15 @@ function outTable = localInsertRuntimeUnderVariance100(apeTable, runtimeTable)
         end
     end
 
-    insertAfter = find(apeTable.NoiseVariance == 100, 1, 'first');
+    insertAfter = find(rmseTable.NoiseVariance == 100, 1, 'first');
     if isempty(insertAfter)
-        outTable = [apeTable; runtimeRow];
+        outTable = [rmseTable; runtimeRow];
         return;
     end
 
-    if insertAfter == height(apeTable)
-        outTable = [apeTable; runtimeRow];
+    if insertAfter == height(rmseTable)
+        outTable = [rmseTable; runtimeRow];
     else
-        outTable = [apeTable(1:insertAfter, :); runtimeRow; apeTable(insertAfter+1:end, :)];
+        outTable = [rmseTable(1:insertAfter, :); runtimeRow; rmseTable(insertAfter+1:end, :)];
     end
 end

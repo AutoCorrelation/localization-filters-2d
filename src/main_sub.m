@@ -15,22 +15,22 @@ if ~exist(resultDir, 'dir')
     mkdir(resultDir);
 end
 
-allApeTable = table();
+allRmseTable = table();
 
 filterNames = {
-    'Baseline', ...
-    'LinearKalmanFilter_DecayQ', ...
-    'NonlinearParticleFilter', ...
-    'EKFParticleFilter', ...
-    'AdaptiveParticleFilter', ...
-    'BeliefQShrinkAdaptiveParticleFilter', ...
-    'RDiagPriorEditAdaptiveParticleFilter', ...
-    'BeliefRougheningAdaptiveParticleFilter', ...
-    'RougheningPriorEditingParticleFilter'
+    'Baseline';
+    'LinearKalmanFilter_DecayQ';
+    'NonlinearParticleFilter';
+    'RegularizedParticleFilter';
+    % 'EKFParticleFilter';
+    'AdaptiveParticleFilter';
+    'RDiagPriorEditAdaptiveParticleFilter';
+    'RougheningPriorEditingParticleFilter';
+    'RBPF'
 };
 filterClasses = filterNames;
 
-apeVarNames = [{'NoiseVariance'}, filterNames];
+rmseVarNames = [{'NoiseVariance'}; filterNames];
 
 for nIdx = 1:numel(particleCounts)
     config = initializeConfig(particleCounts(nIdx));
@@ -60,13 +60,13 @@ for nIdx = 1:numel(particleCounts)
     end
 
     numNoise = numel(config.noiseVariance);
-    apeMatrix = zeros(numNoise, numFilters);
+    rmseMatrix = zeros(numNoise, numFilters);
     for fIdx = 1:numFilters
-        apeMatrix(:, fIdx) = filterMetrics{fIdx}.APE(:);
+        rmseMatrix(:, fIdx) = filterMetrics{fIdx}.RMSE(:);
     end
 
-    apeTable = array2table([config.noiseVariance(:), apeMatrix], ...
-        'VariableNames', apeVarNames);
+    rmseTable = array2table([config.noiseVariance(:), rmseMatrix], ...
+        'VariableNames', rmseVarNames);
 
     runtimeTable = table(filterNames(:), filterTimes(:), ...
         'VariableNames', {'FilterName', 'RuntimeSec'});
@@ -79,23 +79,23 @@ for nIdx = 1:numel(particleCounts)
     end
     fprintf('\n');
 
-    plotMetricComparison(config.noiseVariance, apeMatrix, filterNames, runtimeTable, config.numParticles, resultDir, config.motionModel);
+    plotMetricComparison(config.noiseVariance, rmseMatrix, filterNames, runtimeTable, config.numParticles, resultDir, config.motionModel);
 
-    savedPaths = saveBenchmarkResults(resultDir, config.numParticles, apeTable, runtimeTable, config.motionModel);
+    savedPaths = saveBenchmarkResults(resultDir, config.numParticles, rmseTable, runtimeTable, config.motionModel);
     fprintf('Saved per-N files:\n');
-    fprintf(' - %s\n', savedPaths.apeCsvPath);
+    fprintf(' - %s\n', savedPaths.rmseCsvPath);
     fprintf('\n');
 
-    apeTableOut = addvars(savedPaths.apeTableWithRuntime, repmat(round(config.numParticles), height(savedPaths.apeTableWithRuntime), 1), ...
+    rmseTableOut = addvars(savedPaths.rmseTableWithRuntime, repmat(round(config.numParticles), height(savedPaths.rmseTableWithRuntime), 1), ...
         'Before', 1, 'NewVariableNames', 'ParticleCount');
-    allApeTable = [allApeTable; apeTableOut]; %#ok<AGROW>
+    allRmseTable = [allRmseTable; rmseTableOut]; %#ok<AGROW>
 
 end
 
 motionPrefix = sprintf('%s_', basic.motionModel);
-allApeCsvPath = fullfile(resultDir, sprintf('benchmark_%sbatch_APE_AllN.csv', motionPrefix));
-writetable(allApeTable, allApeCsvPath);
+allRmseCsvPath = fullfile(resultDir, sprintf('benchmark_%sbatch_RMSE_AllN.csv', motionPrefix));
+writetable(allRmseTable, allRmseCsvPath);
 
 fprintf('Saved aggregated files:\n');
-fprintf(' - %s\n', allApeCsvPath);
+fprintf(' - %s\n', allRmseCsvPath);
 fprintf('\n');

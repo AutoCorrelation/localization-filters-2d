@@ -1,7 +1,7 @@
-function figHandle = plotMetricComparison(noiseVariance, apeMatrix, filterNames, runtimeTable, particleCount, resultDir, motionModel)
-% plotMetricComparison - Plot APE and runtime summary in one figure with subplots.
+function figHandle = plotMetricComparison(noiseVariance, rmseMatrix, filterNames, runtimeTable, particleCount, resultDir, motionModel)
+% plotMetricComparison - Plot RMSE and runtime summary in one figure with subplots.
 % Usage:
-%   plotMetricComparison(noiseVariance, apeMatrix, filterNames, runtimeTable, particleCount, resultDir, motionModel)
+%   plotMetricComparison(noiseVariance, rmseMatrix, filterNames, runtimeTable, particleCount, resultDir, motionModel)
 % motionModel: 'cv' or 'imm' for filename prefix
 
     if nargin < 7 || isempty(motionModel)
@@ -16,7 +16,7 @@ filterLabels = localClassNamesToLegend(filterNames);
 figHandle = figure('Name', sprintf('Benchmark (N=%d)', round(particleCount)), 'NumberTitle', 'off');
 
 subplot(2, 1, 1);
-hLines = semilogx(noiseVariance, apeMatrix, 'LineWidth', 1.5);
+hLines = semilogx(noiseVariance, rmseMatrix, 'LineWidth', 1.5);
 
 markerPool = {'o', 's', '^', 'v', 'd', 'p', 'h', 'x', '+', '*', '>'};
 for i = 1:numel(hLines)
@@ -27,8 +27,8 @@ end
 
 legend(filterLabels, 'Location', 'northwest');
 xlabel('Noise Variance');
-ylabel('APE (Average Position Error)');
-title(sprintf('APE Comparison by Noise Level (N=%d)', round(particleCount)));
+ylabel('RMSE');
+title(sprintf('RMSE Comparison by Noise Level (N=%d)', round(particleCount)));
 grid on;
 
 subplot(2, 1, 2);
@@ -69,16 +69,16 @@ function labels = localClassNamesToLegend(filterNames)
                 labels{i} = 'LinearKF_DecayQ';
             case 'NonlinearParticleFilter'
                 labels{i} = 'NonLinearPF';
+            case 'RBPF'
+                labels{i} = 'RBPF';
+            case 'RegularizedParticleFilter'
+                labels{i} = 'RegularizedPF';
             case 'EKFParticleFilter'
                 labels{i} = 'EKF-PF';
             case 'AdaptiveParticleFilter'
                 labels{i} = 'AdaptivePF(AdaBelief)';
-            case 'BeliefQShrinkAdaptiveParticleFilter'
-                labels{i} = 'BeliefQShrinkAdaptivePF';
             case 'RDiagPriorEditAdaptiveParticleFilter'
                 labels{i} = 'RDiagPriorEditAdaptivePF';
-            case 'BeliefRougheningAdaptiveParticleFilter'
-                labels{i} = 'BeliefRougheningAdaptivePF';
             case 'RougheningPriorEditingParticleFilter'
                 labels{i} = 'RougheningPriorEditingPF';
         end

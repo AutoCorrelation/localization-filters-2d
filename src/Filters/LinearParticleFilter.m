@@ -8,7 +8,7 @@ classdef LinearParticleFilter
         processBias
         toaNoise
         numParticles
-        noiseScale
+        noiseStd
         resampleThresholdRatio
     end
 
@@ -26,7 +26,7 @@ classdef LinearParticleFilter
             obj.numParticles = config.numParticles;
             obj.resampleThresholdRatio = config.resampleThresholdRatio;
 
-            obj.noiseScale = sqrt(config.noiseVariance(noiseIdx));
+            obj.noiseStd = sqrt(config.noiseVariance(noiseIdx));
         end
 
         function state = initializeState(obj, numPoints)
@@ -71,7 +71,7 @@ classdef LinearParticleFilter
 
         function particles = sampleToa(obj, center)
             if isempty(obj.toaNoise)
-                particles = center + obj.noiseScale * randn(2, obj.numParticles);
+                particles = center + obj.noiseStd * randn(2, obj.numParticles);
                 return;
             end
 
@@ -81,7 +81,7 @@ classdef LinearParticleFilter
 
         function noise = sampleProcess(obj)
             if isempty(obj.processNoise)
-                noise = obj.noiseScale * randn(2, obj.numParticles);
+                noise = obj.noiseStd * randn(2, obj.numParticles);
                 return;
             end
 

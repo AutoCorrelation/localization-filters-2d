@@ -83,9 +83,7 @@ This section captures the currently verified runtime flow and module connectivit
   - `CustomNonlinearParticleFilter`
   - `EKFParticleFilter`
   - `AdaptiveParticleFilter`
-  - `BeliefQShrinkAdaptiveParticleFilter` (`bqspf` alias)
   - `RDiagPriorEditAdaptiveParticleFilter` (`rdpepf` alias)
-  - `BeliefRougheningAdaptiveParticleFilter` (`brapf` alias)
   - `RougheningPriorEditingParticleFilter` (`rpepf` alias)
 - `Adaptive*` variants consume per-noise hyperparameters from `getBestParams(noiseIdx)`.
 

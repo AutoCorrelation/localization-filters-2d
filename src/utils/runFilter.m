@@ -58,6 +58,10 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
             filterObj = LinearKalmanFilter_DecayQ(data, config, noiseIdx);
         case 'nonlinearparticlefilter'
             filterObj = NonlinearParticleFilter(data, config, noiseIdx);
+        case {'rbpf', 'raoblackwellizedparticlefilter'}
+            filterObj = RBPF(data, config, noiseIdx);
+        case {'regularizedparticlefilter', 'rpf'}
+            filterObj = RegularizedParticleFilter(data, config, noiseIdx);
         case 'customnonlinearparticlefilter'
             filterObj = CustomNonlinearParticleFilter(data, config, noiseIdx);
         case 'ekfparticlefilter'
@@ -65,15 +69,9 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
         case 'adaptiveparticlefilter'
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = AdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
-        case {'beliefqshrinkadaptiveparticlefilter', 'bqspf'}
-            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
-            filterObj = BeliefQShrinkAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
         case {'rdiagprioreditadaptiveparticlefilter', 'rdpepf'}
             [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
             filterObj = RDiagPriorEditAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
-        case {'beliefrougheningadaptiveparticlefilter', 'brapf'}
-            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
-            filterObj = BeliefRougheningAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
         case {'rougheningprioreditingparticlefilter', 'rpepf'}
             filterObj = RougheningPriorEditingParticleFilter(data, config, noiseIdx);
 

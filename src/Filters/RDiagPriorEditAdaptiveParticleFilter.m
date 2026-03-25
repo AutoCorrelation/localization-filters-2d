@@ -110,7 +110,7 @@ classdef RDiagPriorEditAdaptiveParticleFilter < AdaptiveParticleFilter
 
         function noise = sampleProcessSingle(obj)
             if isempty(obj.processNoise)
-                noise = obj.noiseScale * randn(2, 1);
+                noise = obj.noiseStd * randn(2, 1);
                 return;
             end
 

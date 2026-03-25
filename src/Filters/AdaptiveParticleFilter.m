@@ -57,7 +57,7 @@ classdef AdaptiveParticleFilter < NonlinearParticleFilter
 
             % Initialize nominal R diagonal and AdaBelief moments (1st, 2nd)
             numAnchors = size(obj.anchorPos, 1);
-            nominalVar = obj.noiseScale^2;                    % noiseVariance(noiseIdx)
+            nominalVar = obj.noiseStd^2;                    % noiseVariance(noiseIdx)
             state.nominalDiagR = nominalVar * ones(numAnchors, 1);
             state.mMoment = zeros(numAnchors, 1);
             state.sMoment = zeros(numAnchors, 1);

@@ -1,7 +1,7 @@
 function [beta, lambdaR] = getBestParams(noiseIdx)
     % Per-noise tuned hyperparameters (IMM baseline table).
-    betaTable = [0.999, 0.995, 0.990, 0.999, 0.995];
-    lambdaRTable = [0.01, 0.1, 2, 50, 0.5];
+    betaTable = [0.98, 0.99, 0.990, 0.90, 0.995];
+    lambdaRTable = [10, 20, 200, 2, 20];
 
     if isempty(noiseIdx) || ~isfinite(noiseIdx)
         beta = 0.90;
