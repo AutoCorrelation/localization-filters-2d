@@ -21,44 +21,59 @@ class SimulationData:
     mode_history: np.ndarray
 
 
+_REQUIRED_KEYS = (
+    "/ranging",
+    "/x_hat_LLS",
+    "/z_LLS",
+    "/R_LLS",
+    "/Q",
+    "/P0",
+    "/processNoise",
+    "/toaNoise",
+    "/processbias",
+    "/true_state",
+    "/mode_history",
+)
+
+
 def _read(h5: h5py.File, key: str) -> np.ndarray:
+    if key not in h5:
+        raise KeyError(f"Missing required dataset key: {key}")
     return np.asarray(h5[key])
 
 
 def _swap_first_last_dims(arr: np.ndarray) -> np.ndarray:
     """Convert H5 storage order to MATLAB array order.
-    
+
     MATLAB writes multi-dimensional arrays to HDF5 using column-major transposition.
     For any N-D array, move noise dimension (axis 0) to last position.
-    
+
     Examples:
-    - 2D (5, M) → (M, 5) using axes=[1, 0]
-    - 3D (5, A, B) → (B, A, 5) using axes=[2, 1, 0]
-    - 4D (5, points, iters, dims) → (dims, points, iters, 5) using axes=[3, 1, 2, 0]
-    - 5D (5, poi nts, iters, dim1, dim2) → (dim1, points, iters, dim2, 5) using axes=[3, 1, 2, 4, 0]
+    - 2D (5, M) -> (M, 5)
+    - 3D (5, A, B) -> (B, A, 5)
+    - 4D (5, points, iters, dims) -> (dims, points, iters, 5)
+    - 5D (5, points, iters, dim1, dim2) -> (dim1, points, iters, dim2, 5)
     """
     if arr.ndim == 1:
         return arr
     if arr.ndim == 2:
-        # (5, M) → (M, 5)
         return np.transpose(arr, axes=[1, 0])
     if arr.ndim == 3:
-        # (5, A, B) → (B, A, 5)
         return np.transpose(arr, axes=[2, 1, 0])
     if arr.ndim == 4:
-        # (5, points, iters, dims) → (dims, points, iters, 5)
         return np.transpose(arr, axes=[3, 1, 2, 0])
-    elif arr.ndim == 5:
-        # (5, points, iters, dim1, dim2) → (dim1, points, iters, dim2, 5)
+    if arr.ndim == 5:
         return np.transpose(arr, axes=[3, 1, 2, 4, 0])
-    else:
-        # Fallback: move first axis to last
-        axes = list(range(1, arr.ndim)) + [0]
-        return np.transpose(arr, axes)
+    axes = list(range(1, arr.ndim)) + [0]
+    return np.transpose(arr, axes)
 
 
 def load_simulation_data(h5_file: str) -> SimulationData:
     with h5py.File(h5_file, "r") as h5:
+        for key in _REQUIRED_KEYS:
+            if key not in h5:
+                raise KeyError(f"Missing required dataset key in {h5_file}: {key}")
+
         ranging = _swap_first_last_dims(_read(h5, "/ranging"))
         x_hat_lls = _swap_first_last_dims(_read(h5, "/x_hat_LLS"))
         z_lls = _swap_first_last_dims(_read(h5, "/z_LLS"))
