@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
+import math
 
 import torch
 
@@ -37,6 +38,7 @@ class BatchedNonlinearPF:
         if device == "cuda" and not torch.cuda.is_available():
             device = "cpu"
         self.device = torch.device(device)
+        self.uniform_log_weight = torch.tensor(-math.log(float(self.num_particles)), dtype=torch.float32, device=self.device)
         self.generator = torch.Generator(device=self.device)
         self.generator.manual_seed(int(seed))
 
@@ -82,10 +84,11 @@ class BatchedNonlinearPF:
             generator=self.generator,
         )
         sampled = bank[:, idx]  # [2, mc, n]
+        # Convert feature-first sampled bank into particle-last layout used by state propagation.
         return sampled.permute(1, 2, 0).contiguous()  # [mc, n, 2]
 
     def _h_nonlinear(self, particles: torch.Tensor) -> torch.Tensor:
-        # particles: [mc, n, 2] -> [mc, n, A]
+        # particles: [mc, n, 2] -> [mc, n, num_anchors]
         diff = particles.unsqueeze(2) - self.anchor_pos.unsqueeze(0).unsqueeze(0)
         return torch.linalg.norm(diff, dim=-1)
 
@@ -123,7 +126,7 @@ class BatchedNonlinearPF:
             vel_prev = sampled_curr - sampled_prev
             log_weights = torch.full(
                 (self.mc_runs, self.num_particles),
-                fill_value=-torch.log(torch.tensor(float(self.num_particles), device=self.device)),
+                fill_value=float(self.uniform_log_weight),
                 dtype=torch.float32,
                 device=self.device,
             )
@@ -156,10 +159,9 @@ class BatchedNonlinearPF:
                 particles_prev = torch.where(mask3, particles_res, particles_no)
                 vel_prev = torch.where(mask3, vel_res, vel_no)
 
-                uniform_log = -torch.log(torch.tensor(float(self.num_particles), device=self.device))
                 log_weights = torch.where(
                     do_resample.view(-1, 1),
-                    uniform_log.expand_as(log_weights),
+                    self.uniform_log_weight,
                     log_weights,
                 )
 

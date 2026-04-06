@@ -35,9 +35,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def _build_dnn_refiner(args: argparse.Namespace, device: str):
+    """Build optional DNN measurement refiner from repository-root DNN.py weights."""
     if not args.dnn_weights:
         return None
 
+    # DNN.py lives at repository root, outside the python package directory.
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))

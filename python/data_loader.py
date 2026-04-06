@@ -70,10 +70,6 @@ def _swap_first_last_dims(arr: np.ndarray) -> np.ndarray:
 
 def load_simulation_data(h5_file: str) -> SimulationData:
     with h5py.File(h5_file, "r") as h5:
-        for key in _REQUIRED_KEYS:
-            if key not in h5:
-                raise KeyError(f"Missing required dataset key in {h5_file}: {key}")
-
         ranging = _swap_first_last_dims(_read(h5, "/ranging"))
         x_hat_lls = _swap_first_last_dims(_read(h5, "/x_hat_LLS"))
         z_lls = _swap_first_last_dims(_read(h5, "/z_LLS"))
