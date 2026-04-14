@@ -45,14 +45,18 @@ parfor i = 1:numNoises
     z_LLS_temp = zeros(6, numPoints, numSamples);
     R_LLS_temp = zeros(6, 6, numPoints, numSamples);
     x_hat_LLS_temp = zeros(2, numPoints, numSamples);
-    true_state_temp = repmat(true_state_base, 1, 1, numSamples);
+    % store true distances (d) between anchors and UE for each sample
+    % shape: (4, numPoints, numSamples)
+    true_state_temp = zeros(4, numPoints, numSamples);
     mode_history_temp = ones(numPoints, numSamples);
     noiseVar = noiseVariance(i);
 
     for j = 1:numSamples
         for k = 1:numPoints
-            d = vecnorm([k; k] - Anchor, 2, 1).';   % 4x1
+            d = vecnorm([k; k] - Anchor, 2, 1).';   % 4x1 (true distances to anchors)
             ranging_temp(:, k, j) = d + sqrt(noiseVar) * randn(4, 1);
+            % save noiseless true distances into true_state_temp
+            true_state_temp(:, k, j) = d;
             z_LLS_temp(:, k, j) = [...
                 ranging_temp(1, k, j)^2 - ranging_temp(2, k, j)^2 - 10^2;
                 ranging_temp(1, k, j)^2 - ranging_temp(3, k, j)^2;

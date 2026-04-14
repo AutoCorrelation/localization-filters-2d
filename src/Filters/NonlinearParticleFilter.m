@@ -1,6 +1,7 @@
 classdef NonlinearParticleFilter < LinearParticleFilter
     properties
         anchorPos
+        Rpoint
     end
 
     methods
@@ -9,13 +10,22 @@ classdef NonlinearParticleFilter < LinearParticleFilter
             obj.z = squeeze(data.ranging(:, :, :, noiseIdx));
             obj.R = 4* config.noiseVariance(noiseIdx) * eye(size(data.ranging, 1));
             obj.anchorPos = config.Anchor';
+            obj.Rpoint = [];
+            if isfield(data, 'R_corrected_point') && ~isempty(data.R_corrected_point)
+                rcp = data.R_corrected_point;
+                if ndims(rcp) == 4
+                    obj.Rpoint = squeeze(rcp(:, :, :, noiseIdx));
+                elseif ndims(rcp) == 3
+                    obj.Rpoint = rcp;
+                end
+            end
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
             particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
             zNow = obj.z(:, pointIdx, iterIdx);
-            weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow);
+            weightsUpd = obj.updateWeightsNonlinear(particlesPred, state.weights, zNow, pointIdx);
 
             est = particlesPred * weightsUpd;
             [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
@@ -43,16 +53,31 @@ classdef NonlinearParticleFilter < LinearParticleFilter
             end
         end
 
-        function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow)
+        function weights = updateWeightsNonlinear(obj, particles, prevWeights, zNow, pointIdx)
             yPred = obj.H_nonlinear(particles);
             numAnchors = size(yPred, 1);
-            Rinv = eye(numAnchors) / (obj.noiseStd^2);
             errors = zNow - yPred;
-            distances = sum((Rinv * errors) .* errors, 1);
 
-            weights = prevWeights(:)' .* exp(-0.5 * distances);
-            weights = weights + 1e-300;
-            weights = (weights / sum(weights)).';
+            if nargin >= 5 && ~isempty(obj.Rpoint) && pointIdx <= size(obj.Rpoint, 3)
+                Rk = obj.Rpoint(:, :, pointIdx);
+                % Corrected scenario: R is treated as diagonal.
+                % Use reciprocal of diagonal entries (with floor for stability).
+                rdiag = diag(Rk);
+                rdiag = max(real(rdiag), 1e-8);
+                rinvDiag = 1 ./ rdiag;
+                distances = sum((errors .^ 2) .* rinvDiag, 1);
+            else
+                Rinv = eye(numAnchors) / (obj.noiseStd^2);
+                distances = sum((Rinv * errors) .* errors, 1);
+            end
+
+            % Log-domain update to avoid under/overflow.
+            logPrev = log(prevWeights(:)' + 1e-300);
+            logW = logPrev - 0.5 * distances;
+            logW = logW - max(logW);
+            weights = exp(logW);
+            weights = weights / sum(weights);
+            weights = weights(:);
         end
 
     end

@@ -7,3 +7,5 @@ __pycache__/
 .vscode/  
 result/
 src/archives/a_results
+
+*.mat

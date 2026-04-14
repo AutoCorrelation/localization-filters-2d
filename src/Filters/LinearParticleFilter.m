@@ -10,6 +10,7 @@ classdef LinearParticleFilter
         numParticles
         noiseStd
         resampleThresholdRatio
+        disableProcessNoise
     end
 
     methods
@@ -25,6 +26,10 @@ classdef LinearParticleFilter
             obj.toaNoise = localExtractNoiseBank(data.toaNoise, noiseIdx);
             obj.numParticles = config.numParticles;
             obj.resampleThresholdRatio = config.resampleThresholdRatio;
+            obj.disableProcessNoise = false;
+            if isfield(config, 'disableProcessNoise') && config.disableProcessNoise
+                obj.disableProcessNoise = true;
+            end
 
             obj.noiseStd = sqrt(config.noiseVariance(noiseIdx));
         end
@@ -80,6 +85,11 @@ classdef LinearParticleFilter
         end
 
         function noise = sampleProcess(obj)
+            if obj.disableProcessNoise
+                noise = zeros(2, obj.numParticles);
+                return;
+            end
+
             if isempty(obj.processNoise)
                 noise = obj.noiseStd * randn(2, obj.numParticles);
                 return;
@@ -111,6 +121,8 @@ classdef LinearParticleFilter
                 rpt = rand(obj.numParticles, 1);
                 [~, ind1] = sort([rpt; wtc]);
                 idx = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
+                % Guard against rare boundary/rounding artifacts.
+                idx = max(min(idx, obj.numParticles), 1);
                 particlesOut = particles(:, idx);
                 weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
                 didResample = true;

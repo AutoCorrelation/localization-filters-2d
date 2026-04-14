@@ -27,7 +27,7 @@ function config = initializeConfig(numParticle)
     else
         config.numParticles = 150;
     end
-    config.resampleThresholdRatio = 0.2;
+    config.resampleThresholdRatio = 0.5;
     config.decayGamma = [0.4 0.5 0.5 0.3 0.5];
 
     % IAE + MAP adaptive PF defaults

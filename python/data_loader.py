@@ -61,9 +61,9 @@ def _swap_first_last_dims(arr: np.ndarray) -> np.ndarray:
     if arr.ndim == 3:
         return np.transpose(arr, axes=[2, 1, 0])
     if arr.ndim == 4:
-        return np.transpose(arr, axes=[3, 1, 2, 0])
+        return np.transpose(arr, axes=[3, 2, 1, 0])
     if arr.ndim == 5:
-        return np.transpose(arr, axes=[3, 1, 2, 4, 0])
+        return np.transpose(arr, axes=[3, 4, 2, 1, 0])
     axes = list(range(1, arr.ndim)) + [0]
     return np.transpose(arr, axes)
 

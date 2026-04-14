@@ -26,7 +26,7 @@ filterNames = {
     'AdaptiveParticleFilter';
     'RDiagPriorEditAdaptiveParticleFilter';
     'RougheningPriorEditingParticleFilter';
-    'RBPF'
+    % 'RBPF'
 };
 filterClasses = filterNames;
 
@@ -44,10 +44,11 @@ for nIdx = 1:numel(particleCounts)
         h5FileName = 'simulation_data_imm.h5';
     else
         h5FileName = 'simulation_data.h5';
+        h5FileName = 'simulation_data_residual_mlp_corrected.h5';
     end
+
     h5File = fullfile(config.pathData, h5FileName);
     data = loadSimulationData(h5File);
-
     numFilters = numel(filterClasses);
     filterTimes = zeros(numFilters, 1);
     filterMetrics = cell(numFilters, 1);

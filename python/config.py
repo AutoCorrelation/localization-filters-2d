@@ -27,6 +27,10 @@ class Config:
     prior_sigma_gate: float = 6.0
     prior_max_retry: int = 30
 
+    parallel_noise: bool = True
+    parallel_backend: Literal["thread", "process"] = "thread"
+    parallel_workers: int | None = None
+
 
     @property
     def anchor(self) -> np.ndarray:
