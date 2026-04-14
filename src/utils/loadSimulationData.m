@@ -12,4 +12,6 @@ function data = loadSimulationData(h5File)
     data.processNoise = h5read(h5File, '/processNoise');
     data.toaNoise = h5read(h5File, '/toaNoise');
     data.processbias = h5read(h5File, '/processbias');
+    data.true_state = h5read(h5File, '/true_state');
+    data.mode_history = h5read(h5File, '/mode_history');
 end

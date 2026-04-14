@@ -5,10 +5,12 @@ classdef LinearParticleFilter
         z
         R
         processNoise
+        processBias
         toaNoise
         numParticles
-        noiseScale
+        noiseStd
         resampleThresholdRatio
+        disableProcessNoise
     end
 
     methods
@@ -19,11 +21,17 @@ classdef LinearParticleFilter
             obj.R = squeeze(data.R_LLS(:, :, :, :, noiseIdx));
 
             obj.processNoise = localExtractNoiseBank(data.processNoise, noiseIdx);
+            processBiasRaw = squeeze(data.processbias(:, noiseIdx));
+            obj.processBias = reshape(processBiasRaw, [2, 1]);
             obj.toaNoise = localExtractNoiseBank(data.toaNoise, noiseIdx);
             obj.numParticles = config.numParticles;
             obj.resampleThresholdRatio = config.resampleThresholdRatio;
+            obj.disableProcessNoise = false;
+            if isfield(config, 'disableProcessNoise') && config.disableProcessNoise
+                obj.disableProcessNoise = true;
+            end
 
-            obj.noiseScale = sqrt(config.noiseVariance(noiseIdx));
+            obj.noiseStd = sqrt(config.noiseVariance(noiseIdx));
         end
 
         function state = initializeState(obj, numPoints)
@@ -47,16 +55,20 @@ classdef LinearParticleFilter
         end
 
         function [state, est] = step(obj, state, iterIdx, pointIdx)
-            particlesPred = state.particlesPrev + state.velPrev + obj.sampleProcess();
+            particlesPred = state.particlesPrev + state.velPrev + obj.processBias + obj.sampleProcess();
 
             Rmat = obj.R(:, :, pointIdx, iterIdx);
             zNow = obj.z(:, pointIdx, iterIdx);
             weightsUpd = obj.updateWeightsLinear(particlesPred, state.weights, zNow, Rmat);
 
             est = particlesPred * weightsUpd;
-            [particlesRes, weightsRes] = obj.resampleEss(particlesPred, weightsUpd);
+            [particlesRes, weightsRes, idxResampled, didResample] = obj.resampleEssWithIndices(particlesPred, weightsUpd);
 
-            state.velPrev = est * ones(1, obj.numParticles) - state.particlesPrev;
+            if didResample
+                state.velPrev = particlesRes - state.particlesPrev(:, idxResampled);
+            else
+                state.velPrev = particlesRes - state.particlesPrev;
+            end
             state.particlesPrev = particlesRes;
             state.weights = weightsRes;
             state.estimatedPos(:, pointIdx) = est;
@@ -64,7 +76,7 @@ classdef LinearParticleFilter
 
         function particles = sampleToa(obj, center)
             if isempty(obj.toaNoise)
-                particles = center + obj.noiseScale * randn(2, obj.numParticles);
+                particles = center + obj.noiseStd * randn(2, obj.numParticles);
                 return;
             end
 
@@ -73,8 +85,13 @@ classdef LinearParticleFilter
         end
 
         function noise = sampleProcess(obj)
+            if obj.disableProcessNoise
+                noise = zeros(2, obj.numParticles);
+                return;
+            end
+
             if isempty(obj.processNoise)
-                noise = obj.noiseScale * randn(2, obj.numParticles);
+                noise = obj.noiseStd * randn(2, obj.numParticles);
                 return;
             end
 
@@ -94,17 +111,26 @@ classdef LinearParticleFilter
         end
 
         function [particlesOut, weightsOut] = resampleEss(obj, particles, weights)
+            [particlesOut, weightsOut, ~, ~] = obj.resampleEssWithIndices(particles, weights);
+        end
+
+        function [particlesOut, weightsOut, idx, didResample] = resampleEssWithIndices(obj, particles, weights)
             ess = 1 / sum(weights .^ 2);
             if ess < obj.numParticles * obj.resampleThresholdRatio
                 wtc = cumsum(weights);
                 rpt = rand(obj.numParticles, 1);
                 [~, ind1] = sort([rpt; wtc]);
-                ind = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
-                particlesOut = particles(:, ind);
+                idx = find(ind1 <= obj.numParticles) - (0:obj.numParticles-1)';
+                % Guard against rare boundary/rounding artifacts.
+                idx = max(min(idx, obj.numParticles), 1);
+                particlesOut = particles(:, idx);
                 weightsOut = ones(obj.numParticles, 1) / obj.numParticles;
+                didResample = true;
             else
                 particlesOut = particles;
                 weightsOut = weights;
+                idx = (1:obj.numParticles)';
+                didResample = false;
             end
         end
     end

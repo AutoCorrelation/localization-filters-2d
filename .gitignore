@@ -4,4 +4,8 @@ data/
 __pycache__/
 *.pyc
 
-.vscode/
+.vscode/  
+result/
+src/archives/a_results
+
+*.mat

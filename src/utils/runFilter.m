@@ -1,4 +1,4 @@
-function [estimatedPos, RMSE] = runFilter(filterClass, data, config)
+function [estimatedPos, metric] = runFilter(filterClass, data, config)
     % Shared parallel execution loop for KF/PF-like filters.
     % The filter class must implement:
     %   initializeState(numPoints)
@@ -14,10 +14,12 @@ function [estimatedPos, RMSE] = runFilter(filterClass, data, config)
 
     estimatedPos = zeros(2, numPoints, numIterations, numNoise);
     RMSE = zeros(numNoise, 1);
+    APE = zeros(numNoise, 1);
 
     parfor noiseIdx = 1:numNoise
         filterObj = localCreateFilter(filterClass, data, config, noiseIdx);
         estNoise = zeros(2, numPoints, numIterations);
+        truePosNoise = localSelectTruePos(data, noiseIdx, numPoints, numIterations);
 
         for iterIdx = 1:numIterations
             state = filterObj.initializeState(numPoints);
@@ -32,8 +34,14 @@ function [estimatedPos, RMSE] = runFilter(filterClass, data, config)
         end
 
         estimatedPos(:, :, :, noiseIdx) = estNoise;
-        [RMSE(noiseIdx), ~] = evaluateFilter(estNoise, 3);
+        [RMSE(noiseIdx), APE(noiseIdx)] = evaluateFilter(estNoise, 3, truePosNoise);
     end
+    metric.RMSE = RMSE;
+    metric.APE = APE;
+end
+
+function truePosNoise = localSelectTruePos(data, noiseIdx, numPoints, numIterations)
+    truePosNoise = data.true_state(1:2, 1:numPoints, 1:numIterations, noiseIdx);
 end
 
 function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
@@ -44,16 +52,28 @@ function filterObj = localCreateFilter(filterClass, data, config, noiseIdx)
 
     className = lower(strtrim(char(filterClass)));
     switch className
-        case 'linearkalmanfilter'
-            filterObj = LinearKalmanFilter(data, config, noiseIdx);
-        case 'linearkalmanfilter_decayq'
-            filterObj = LinearKalmanFilter_DecayQ(data, config, noiseIdx);
-        case 'linearparticlefilter'
-            filterObj = LinearParticleFilter(data, config, noiseIdx);
-        case 'nonlinearparticlefilter'
-            filterObj = NonlinearParticleFilter(data, config, noiseIdx);
         case 'baseline'
             filterObj = Baseline(data, config, noiseIdx);
+        case 'linearkalmanfilter_decayq'
+            filterObj = LinearKalmanFilter_DecayQ(data, config, noiseIdx);
+        case 'nonlinearparticlefilter'
+            filterObj = NonlinearParticleFilter(data, config, noiseIdx);
+        case {'rbpf', 'raoblackwellizedparticlefilter'}
+            filterObj = RBPF(data, config, noiseIdx);
+        case {'regularizedparticlefilter', 'rpf'}
+            filterObj = RegularizedParticleFilter(data, config, noiseIdx);
+        case 'customnonlinearparticlefilter'
+            filterObj = CustomNonlinearParticleFilter(data, config, noiseIdx);
+        case 'ekfparticlefilter'
+            filterObj = EKFParticleFilter(data, config, noiseIdx);
+        case 'adaptiveparticlefilter'
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = AdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'rdiagprioreditadaptiveparticlefilter', 'rdpepf'}
+            [bestBeta, bestLambdaR] = getBestParams(noiseIdx);
+            filterObj = RDiagPriorEditAdaptiveParticleFilter(data, config, noiseIdx, bestBeta, bestLambdaR);
+        case {'rougheningprioreditingparticlefilter', 'rpepf'}
+            filterObj = RougheningPriorEditingParticleFilter(data, config, noiseIdx);
 
         otherwise
             error('runFilter:UnsupportedFilter', 'Unsupported filterClass: %s', char(filterClass));
