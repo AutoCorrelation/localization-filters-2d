@@ -91,6 +91,7 @@ z_LLS = cat(4, z_LLS_cell{:});
 R_LLS = cat(5, R_LLS_cell{:});
 true_state = cat(4, true_state_cell{:});
 mode_history = cat(3, mode_history_cell{:});
+true_position = repmat(true_pos, [1, 1, numSamples, numNoises]);
 
 Q = zeros(2, 2, numNoises);
 P0 = zeros(2, 2, numNoises);
@@ -170,6 +171,9 @@ h5write(h5File, '/processbias', processbias);
 
 h5create(h5File, '/true_state', size(true_state), 'DataType', 'double');
 h5write(h5File, '/true_state', true_state);
+
+h5create(h5File, '/true_position', size(true_position), 'DataType', 'double');
+h5write(h5File, '/true_position', true_position);
 
 h5create(h5File, '/mode_history', size(mode_history), 'DataType', 'double');
 h5write(h5File, '/mode_history', mode_history);

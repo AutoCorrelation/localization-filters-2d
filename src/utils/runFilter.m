@@ -34,13 +34,30 @@ function [estimatedPos, metric] = runFilter(filterClass, data, config)
         end
 
         estimatedPos(:, :, :, noiseIdx) = estNoise;
-        [RMSE(noiseIdx), APE(noiseIdx)] = evaluateFilter(estNoise, 3, truePosNoise);
+        % Evaluate from step 1 (include the very first point in error calc)
+        [RMSE(noiseIdx), APE(noiseIdx)] = evaluateFilter(estNoise, 1, truePosNoise);
     end
     metric.RMSE = RMSE;
     metric.APE = APE;
 end
 
 function truePosNoise = localSelectTruePos(data, noiseIdx, numPoints, numIterations)
+    if isfield(data, 'true_position') && ~isempty(data.true_position)
+        tp = data.true_position;
+        if ndims(tp) == 2
+            truePosNoise = repmat(tp(1:2, 1:numPoints), [1, 1, numIterations]);
+            return;
+        end
+        if ndims(tp) == 3
+            truePosNoise = tp(1:2, 1:numPoints, 1:numIterations);
+            return;
+        end
+        if ndims(tp) >= 4
+            truePosNoise = tp(1:2, 1:numPoints, 1:numIterations, noiseIdx);
+            return;
+        end
+    end
+
     truePosNoise = data.true_state(1:2, 1:numPoints, 1:numIterations, noiseIdx);
 end
 

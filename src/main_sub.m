@@ -7,7 +7,8 @@ addpath('./utils');
 initializeParpool(5);
 basic = initializeConfig;
 % dataGenerate(basic);
-particleCounts = [10, 50, 100, 200, 500, 1e3];
+% particleCounts = [10, 50, 100, 200, 500, 1e3];
+particleCounts = [1e3];
 
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 resultDir = fullfile(projectRoot, 'result');
@@ -24,8 +25,8 @@ filterNames = {
     'RegularizedParticleFilter';
     % 'EKFParticleFilter';
     'AdaptiveParticleFilter';
-    'RDiagPriorEditAdaptiveParticleFilter';
-    'RougheningPriorEditingParticleFilter';
+    % 'RDiagPriorEditAdaptiveParticleFilter';
+    % 'RougheningPriorEditingParticleFilter';
     % 'RBPF'
 };
 filterClasses = filterNames;
@@ -44,7 +45,7 @@ for nIdx = 1:numel(particleCounts)
         h5FileName = 'simulation_data_imm.h5';
     else
         h5FileName = 'simulation_data.h5';
-        h5FileName = 'simulation_data_residual_mlp_corrected.h5';
+        % h5FileName = 'simulation_data_residual_mlp_corrected.h5';
     end
 
     h5File = fullfile(config.pathData, h5FileName);
@@ -52,12 +53,14 @@ for nIdx = 1:numel(particleCounts)
     numFilters = numel(filterClasses);
     filterTimes = zeros(numFilters, 1);
     filterMetrics = cell(numFilters, 1);
+    filterEstimates = cell(numFilters, 1);
 
     for fIdx = 1:numFilters
         tStart = tic;
-        [~, metricOut] = runFilter(filterClasses{fIdx}, data, config);
+        [estimatedPos, metricOut] = runFilter(filterClasses{fIdx}, data, config);
         filterTimes(fIdx) = toc(tStart);
         filterMetrics{fIdx} = metricOut;
+        filterEstimates{fIdx} = estimatedPos;
     end
 
     numNoise = numel(config.noiseVariance);
@@ -83,8 +86,10 @@ for nIdx = 1:numel(particleCounts)
     plotMetricComparison(config.noiseVariance, rmseMatrix, filterNames, runtimeTable, config.numParticles, resultDir, config.motionModel);
 
     savedPaths = saveBenchmarkResults(resultDir, config.numParticles, rmseTable, runtimeTable, config.motionModel);
+    savedEstimatePaths = saveEstimatedResultsH5(resultDir, config.numParticles, filterNames, filterEstimates, config.noiseVariance, config.motionModel);
     fprintf('Saved per-N files:\n');
     fprintf(' - %s\n', savedPaths.rmseCsvPath);
+    fprintf(' - %s\n', savedEstimatePaths.estimatesH5Path);
     fprintf('\n');
 
     rmseTableOut = addvars(savedPaths.rmseTableWithRuntime, repmat(round(config.numParticles), height(savedPaths.rmseTableWithRuntime), 1), ...

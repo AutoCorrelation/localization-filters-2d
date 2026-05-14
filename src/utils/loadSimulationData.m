@@ -14,4 +14,14 @@ function data = loadSimulationData(h5File)
     data.processbias = h5read(h5File, '/processbias');
     data.true_state = h5read(h5File, '/true_state');
     data.mode_history = h5read(h5File, '/mode_history');
+
+    data.true_position = [];
+    if localHasDataset(h5File, 'true_position')
+        data.true_position = h5read(h5File, '/true_position');
+    end
+end
+
+function tf = localHasDataset(h5File, datasetName)
+    info = h5info(h5File);
+    tf = any(strcmp({info.Datasets.Name}, datasetName));
 end

@@ -164,6 +164,7 @@ R_LLS = cat(5, R_LLS_cell{:});
 
 true_state = cat(4, true_state_cell{:});
 mode_history = cat(3, mode_history_cell{:});
+true_position = true_state(1:2, :, :, :);
 
 % Match CV pipeline for Q/P0 estimation from x_hat trajectory statistics.
 vel = x_hat_LLS(:, 2, :, :) - x_hat_LLS(:, 1, :, :);
@@ -248,6 +249,9 @@ h5write(h5File, '/processbias', processbias);
 % Optional datasets for IMM analysis (not required by existing loaders)
 h5create(h5File, '/true_state', size(true_state), 'DataType', 'double');
 h5write(h5File, '/true_state', true_state);
+
+h5create(h5File, '/true_position', size(true_position), 'DataType', 'double');
+h5write(h5File, '/true_position', true_position);
 
 h5create(h5File, '/mode_history', size(mode_history), 'DataType', 'double');
 h5write(h5File, '/mode_history', mode_history);

@@ -1,6 +1,9 @@
 classdef DataGenerator
+    % DataGenerator generates synthetic trajectory data and corresponding noisy Time of Arrival (ToA) measurements for localization tasks.
+    % It supports multiple trajectory types (constant velocity, circular, zigzag) and allows for configurable noise levels.
+    % The generated data is saved in HDF5 format for use in localization filter evaluations.
     properties
-        true_state
+        gt_pos
         trajectory
         anchors = [0 10; 0 0; 10 0; 10 10]'
     end
@@ -16,7 +19,7 @@ classdef DataGenerator
             if trajectory == "cv"
                 x = linspace(0, 10, steps);
                 y = linspace(0, 10, steps);
-                obj.true_state = [x; y];
+                obj.gt_pos = [x; y];
                 obj.trajectory = trajectory;
 
             elseif trajectory == "circular"
@@ -24,12 +27,12 @@ classdef DataGenerator
                 R = 3;
                 x = linspace(0, 2 * pi, steps);
                 y = linspace(0, 2 * pi, steps);
-                obj.true_state = center + R * [cos(x + pi); sin(y + pi)];
+                obj.gt_pos = center + R * [cos(x + pi); sin(y + pi)];
                 obj.trajectory = trajectory;
             elseif trajectory == "zigzag"
                 x = linspace(0, 10, steps);
                 y = 5 + 3 * sin(4 * pi * x / 10);
-                obj.true_state = [x; y];
+                obj.gt_pos = [x; y];
                 obj.trajectory = trajectory;
             else
                 error('Unsupported trajectory type. Use "cv", "circular", or "zigzag".');
@@ -42,8 +45,8 @@ classdef DataGenerator
 
         function visualize(obj)
             figure;
-            % time = 0:size(obj.true_state, 2) - 1;
-            plot(obj.true_state(1, :), obj.true_state(2, :), 'b-', 'LineWidth', 2, 'Marker', 'o', 'MarkerSize', 8, 'MarkerFaceColor', 'r');
+            % time = 0:size(obj.gt_pos, 2) - 1;
+            plot(obj.gt_pos(1, :), obj.gt_pos(2, :), 'b-', 'LineWidth', 2, 'Marker', 'o', 'MarkerSize', 8, 'MarkerFaceColor', 'r');
             xlabel('X');
             ylabel('Y');
             title(['Trajectory: ', obj.trajectory]);
@@ -62,30 +65,30 @@ classdef DataGenerator
                 h5Path = fullfile(dataDir, char("ranging_data_" + string(obj.trajectory) + ".h5"));
             end
 
-            distance = sqrt((obj.true_state(1, :) - obj.anchors(1, :)').^2 + (obj.true_state(2, :) - obj.anchors(2, :)').^2); % [anchor, step]
+            gt_ranging = sqrt((obj.gt_pos(1, :) - obj.anchors(1, :)').^2 + (obj.gt_pos(2, :) - obj.anchors(2, :)').^2); % [anchor, step]
             noiseVar = [0.01, 0.1, 1, 10, 100];
-            shape = [size(distance), numData]; % [anchor, step, sample]
+            shape = [size(gt_ranging), numData]; % [anchor, step, sample]
             noise_001 = sqrt(noiseVar(1)) * randn(shape);
             noise_01 = sqrt(noiseVar(2)) * randn(shape);
             noise_1 = sqrt(noiseVar(3)) * randn(shape);
             noise_10 = sqrt(noiseVar(4)) * randn(shape);
             noise_100 = sqrt(noiseVar(5)) * randn(shape);
 
-            ranging_001 = distance + noise_001;
-            ranging_01 = distance + noise_01;
-            ranging_1 = distance + noise_1;
-            ranging_10 = distance + noise_10;
-            ranging_100 = distance + noise_100;
+            ranging_001 = gt_ranging + noise_001;
+            ranging_01 = gt_ranging + noise_01;
+            ranging_1 = gt_ranging + noise_1;
+            ranging_10 = gt_ranging + noise_10;
+            ranging_100 = gt_ranging + noise_100;
 
             if exist(h5Path, 'file') == 2
                 delete(h5Path);
             end
 
-            h5create(h5Path, '/true_position', size(obj.true_state)); % [2, step]
-            h5write(h5Path, '/true_position', obj.true_state);
+            h5create(h5Path, '/gt_position', size(obj.gt_pos)); % [2, step]
+            h5write(h5Path, '/gt_position', obj.gt_pos);
 
-            h5create(h5Path, '/distance', size(distance)); % [anchor, step]
-            h5write(h5Path, '/distance', distance);
+            h5create(h5Path, '/gt_ranging', size(gt_ranging)); % [anchor, step]
+            h5write(h5Path, '/gt_ranging', gt_ranging);
 
             h5create(h5Path, '/ranging_001', size(ranging_001));
             h5write(h5Path, '/ranging_001', ranging_001);

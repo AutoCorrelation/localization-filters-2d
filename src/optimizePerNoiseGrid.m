@@ -156,6 +156,17 @@ function dataOut = splitDataBySample(dataIn, splitName, splitRatios, splitSeed)
     dataOut.processNoise = dataIn.processNoise(:, idx, :);
     dataOut.toaNoise = dataIn.toaNoise(:, idx, :);
     dataOut.true_state = dataIn.true_state(:, :, idx, :);
+    if isfield(dataIn, 'true_position') && ~isempty(dataIn.true_position)
+        if ndims(dataIn.true_position) == 2
+            dataOut.true_position = dataIn.true_position;
+        elseif ndims(dataIn.true_position) == 3
+            dataOut.true_position = dataIn.true_position(:, :, idx);
+        else
+            dataOut.true_position = dataIn.true_position(:, :, idx, :);
+        end
+    else
+        dataOut.true_position = [];
+    end
     dataOut.mode_history = dataIn.mode_history(:, idx, :);
 
     dataOut.split.name = char(splitName);
@@ -195,5 +206,21 @@ function [rmse, ape] = evalSingleNoiseFilterWithMetrics(filterFactory, data, con
 end
 
 function truePosNoise = localSelectTruePos(data, noiseIdx, numPoints, numIterations)
+    if isfield(data, 'true_position') && ~isempty(data.true_position)
+        tp = data.true_position;
+        if ndims(tp) == 2
+            truePosNoise = repmat(tp(1:2, 1:numPoints), [1, 1, numIterations]);
+            return;
+        end
+        if ndims(tp) == 3
+            truePosNoise = tp(1:2, 1:numPoints, 1:numIterations);
+            return;
+        end
+        if ndims(tp) >= 4
+            truePosNoise = tp(1:2, 1:numPoints, 1:numIterations, noiseIdx);
+            return;
+        end
+    end
+
     truePosNoise = data.true_state(1:2, 1:numPoints, 1:numIterations, noiseIdx);
 end

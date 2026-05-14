@@ -8,9 +8,10 @@ h5path = 'ranging_data_cv.h5';
 info = h5info(h5path);
 data.allRanging = h5read(h5path, '/allRanging');
 data.allRanging_corrected = h5read(h5path, '/allRanging_corrected');
-data.distance = h5read(h5path, '/distance');
-data.true_position = h5read(h5path, '/true_position');
-
+% data.gt_ranging = h5read(h5path, '/true_state');
+% data.gt_position = h5read(h5path, '/true_position');
+data.gt_ranging = h5read(h5path, '/distance');
+data.gt_position = h5read(h5path, '/true_position');
 
 %% Filter estimation
 % particle filter
@@ -27,7 +28,7 @@ RUN_EKF = true;   % EKF
 RUN_DNN = false;  %
 
 results = struct();
-estimatedPF = zeros([size(data.true_position),ITERATION, NOISE_SIZE]);
+estimatedPF = zeros([size(data.gt_position),ITERATION, NOISE_SIZE]);
 
 % for N = 1:NOISE_SIZE
 %     parfor I = 1:ITERATION
@@ -38,22 +39,35 @@ estimatedPF = zeros([size(data.true_position),ITERATION, NOISE_SIZE]);
 % results.estimatedPF = estimatedPF;
 % clear estimatedPF;
 
+
+%
 addpath('src');
 addpath('src/utils');
 % 기본 경로 자동 탐색 + 기본 저장
 
+
 % 경로/저장파일 지정
-stats = estimateCorrectedMeasurementCovariance('ranging_data_cv.h5', 'R_corrected_stats.mat');
+% 1) trajectory별 R 추정 저장 (한 파일에 누적)
+estimateCorrectedMeasurementCovariance('ranging_data_cv.h5', ...
+    'R_corrected_stats.mat', 'cv');
+% estimateCorrectedMeasurementCovariance('ranging_data_circular.h5', ...
+%     'R_corrected_stats.mat', 'circular');
+% estimateCorrectedMeasurementCovariance('ranging_data_zigzag.h5', ...
+%     'R_corrected_stats.mat', 'zigzag');
+
 opts = struct();
 opts.filterList = {'Baseline'; 'NonlinearParticleFilter'};
 opts.compareCorrected = true;
-opts.disablePredictNoiseCorrected = true;
-% 필요시 직접 주입 가능:
-load('R_corrected_stats.mat');
-opts.RCorrectedPoint = stats.R_corrected_point; 
+opts.trajectoryName = 'cv';  % 또는 circular, zigzag
+results1 = quick_eval('ranging_data_cv.h5', opts);
+hold on 
+semilogx([0.01, 0.1, 1, 10, 100],[0.087495 0.145015 0.560305 1.586846 3.063330],'x--', 'LineWidth', 2, 'MarkerSize', 10, 'DisplayName', 'PF->DNN');
 
-results = quick_eval('ranging_data_cv.h5', opts);
-
+% opts.trajectoryName = 'circular';  % 또는 circular, zigzag
+% results2 = quick_eval('ranging_data_circular.h5', opts);
+% opts.trajectoryName = 'zigzag';  % 또는 circular, zigzag
+% results3 = quick_eval('ranging_data_zigzag.h5', opts);
+%}
 
 %% HDF5 (re)writing
 dset = '/estimatedPF';
